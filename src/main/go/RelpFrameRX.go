@@ -10,7 +10,7 @@ type RelpFrameRX struct {
 }
 
 func (rxFrame *RelpFrameRX) ParseResponseCode() (int, error) {
-	var code []byte = make([]byte, 0, 3)
+	var code = make([]byte, 3, 3)
 	for i, v := range rxFrame.data {
 		if i == 3 && v == ' ' {
 			num, err := strconv.ParseInt(string(code), 10, 64)

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"net"
 )
@@ -30,8 +31,8 @@ func (relpConn *RelpConnection) Init() {
 	relpConn.state = STATE_CLOSED
 	relpConn.rxBufferSize = 512
 	relpConn.txBufferSize = 262144
-	relpConn.preAllocRxBuffer = bytes.NewBuffer(make([]byte, 512))
-	relpConn.preAllocTxBuffer = bytes.NewBuffer(make([]byte, 262144))
+	relpConn.preAllocRxBuffer = bytes.NewBuffer(make([]byte, 0, 512))
+	relpConn.preAllocTxBuffer = bytes.NewBuffer(make([]byte, 0, 262144))
 }
 
 func (relpConn *RelpConnection) Connect(hostname string, port int) bool {
@@ -151,36 +152,48 @@ func (relpConn *RelpConnection) SendBatch(batch *RelpBatch) {
 }
 
 func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) {
+	log.Printf("Reading ACKs for batchID: %v\n", batch.requestId)
 	var parser *RelpParser = nil
 	notComplete := relpConn.window.Size() > 0
-	var cn net.Conn = *relpConn.connection
+	var cn = *relpConn.connection
 
 	for notComplete {
-		log.Printf("RelpConnection.ReadAcks: Need to read...\n")
+		tmp := make([]byte, 64)
+		readBytes := 0
+		for {
+			n, err := cn.Read(tmp)
 
-		// read buffer
-		readBytes, err := cn.Read(relpConn.preAllocRxBuffer.Bytes())
+			if err != nil {
+				if err != io.EOF {
+					log.Fatalln("Could not read ack from batch")
+				} else {
+					log.Println("Encountered EOF in ACK")
+					break
+				}
+			}
 
-		if err != nil {
-			log.Fatalln("Could not read ack from batch")
-		} else {
-			log.Printf("RelpConnection.ReadAcks: Read %v byte(s): \n--\n%v\n--\n", readBytes, string(relpConn.preAllocRxBuffer.Bytes()))
+			relpConn.preAllocRxBuffer.Write(tmp[0:n])
+			readBytes += n
+			if tmp[n-1] == '\n' {
+				break
+			}
 		}
 
+		parsedBytes := 0
 		if readBytes > 0 {
-			for relpConn.preAllocRxBuffer.Len() > 0 {
+			log.Printf("Read %v byte(s) as ACK\n", readBytes)
+			for parsedBytes < readBytes {
 				if parser == nil {
 					parser = &RelpParser{}
 				}
-				var readFromBuffer []byte
-				_, err := relpConn.preAllocRxBuffer.Read(readFromBuffer)
-				if err != nil {
-					return
-				}
-				//log.Println("ReadAcks:Bytes: ", string(readFromBuffer))
+
+				nextBytes := relpConn.preAllocRxBuffer.Next(1) // len always 1
+				//log.Printf("Parsing byte: %v (str: %v)", nextBytes[0], string(nextBytes[0]))
+				parser.Parse(nextBytes[0])
+				parsedBytes++
 
 				if parser.isComplete {
-					log.Printf("ReadAcks: Parser complete\n")
+					log.Printf("ReadAcks: Parsing complete\n")
 					// resp read successfully
 					txnId := parser.frameTxnId
 					if relpConn.window.IsPending(txnId) {
@@ -218,14 +231,15 @@ func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) {
 func (relpConn *RelpConnection) SendRelpRequestAsync(tx *RelpFrameTX) {
 	var buf *bytes.Buffer = bytes.NewBuffer(make([]byte, 0, tx.dataLength))
 	// FIXME? server does not seem to like sending overlarge buffers
-	/*if tx.dataLength > relpConn.txBufferSize {
+	if tx.dataLength > relpConn.txBufferSize {
 		buf = bytes.NewBuffer(make([]byte, 0, tx.dataLength))
+		relpConn.preAllocTxBuffer = buf
 	} else {
 		buf = relpConn.preAllocTxBuffer
-	}*/
+	}
 
 	tx.Write(buf)
-	var cn net.Conn = *relpConn.connection
+	var cn = *relpConn.connection
 	n, err := cn.Write(buf.Bytes())
 	if err != nil {
 		log.Fatalln("Could not write bytes to net.Conn")

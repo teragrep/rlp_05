@@ -16,10 +16,9 @@ func main() {
 
 	batch.PutRequest(&RelpFrameTX{
 		RelpFrame{
-			transactionId: 1337,
-			cmd:           "syslog",
-			dataLength:    10,
-			data:          []byte("HelloWorld"),
+			cmd:        "syslog",
+			dataLength: len([]byte("HelloWorld")),
+			data:       []byte("HelloWorld"),
 		},
 	})
 

@@ -40,6 +40,7 @@ func (parser *RelpParser) Parse(b byte) {
 				} else {
 					log.Printf("RelpParser: Got frameTxnId %v\n", num)
 					parser.frameTxnId = num
+					parser.state = PS_CMD
 				}
 			} else {
 				parser.frameTxnIdString += string(b)
@@ -113,8 +114,8 @@ func (parser *RelpParser) Parse(b byte) {
 			if parser.frameLenLeft > 0 {
 				parser.frameData.WriteByte(b)
 				parser.frameLenLeft -= 1
-				log.Printf("RelpParser: Wrote %v to buffer (str: %v), %v byte(s) left...",
-					b, string(b), parser.frameLenLeft)
+				//log.Printf("RelpParser: Wrote %v to buffer (str: %v), %v byte(s) left...",
+				//b, string(b), parser.frameLenLeft)
 			}
 
 			if parser.frameLenLeft == 0 {

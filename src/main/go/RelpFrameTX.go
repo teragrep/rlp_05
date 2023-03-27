@@ -11,8 +11,10 @@ type RelpFrameTX struct {
 	RelpFrame
 }
 
-const SP byte = 32
-const NL byte = 10
+const (
+	SP byte = 32 // byte for ' '
+	NL byte = 10 // byte for \n
+)
 
 func (txFrame *RelpFrameTX) Write(byteBuf *bytes.Buffer) *bytes.Buffer {
 	log.Println("RelpFrameTX: Write to buffer")
