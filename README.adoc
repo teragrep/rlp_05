@@ -1,0 +1,59 @@
+[#_rlp_05]
+= RLP_05
+
+Golang RELP library, allows the use of the RELP protocol in Golang
+
+Requirements: Go v1.19 or newer
+
+== Basic usage
+
+[,go]
+----
+func main() {
+        // Create a relp connection to localhost:1601
+	relpSess := RelpConnection{}
+	relpSess.Init()
+	relpSess.Connect("127.0.0.1", 1601)
+        // Create a RELP batch, and insert a frame to it
+	batch := RelpBatch{}
+	batch.Init()
+
+	batch.PutRequest(&RelpFrameTX{
+		RelpFrame{
+			cmd:        "syslog",
+			dataLength: len([]byte("HelloWorld")),
+			data:       []byte("HelloWorld"),
+		},
+	})
+
+        // Commit the batch and disconnect gracefully
+	relpSess.Commit(&batch)
+	relpSess.Disconnect()
+
+	// await for input, so the program doesn't exit
+	a := 0.0
+	fmt.Scanf("%f", &a)
+}
+----
+
+== TODO
+
+|===
+|Feature |Status
+
+|Basic RELP connection
+|Can connect, receive and send messages
+
+|Error handling (timeouts)
+|Not implemented yet
+
+|Unit testing
+|Not implemented yet
+
+|Documentation
+|TBD
+
+|???
+|???
+|===
+
