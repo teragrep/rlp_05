@@ -12,7 +12,6 @@ import (
 )
 
 const MAX_COMMAND_LENGTH int = 11
-const OFFER string = "\nrelp_version=0\nrelp_software=RLP-05\ncommands=syslog\n"
 const (
 	STATE_CLOSED = 0
 	STATE_OPEN   = 1
@@ -30,6 +29,7 @@ type RelpConnection struct {
 	connection       *net.Conn
 	state            int
 	window           *RelpWindow
+	offer            []byte
 }
 
 // Init initializes the connection struct with CLOSED state and allocates the TX/RX buffers
@@ -37,8 +37,12 @@ func (relpConn *RelpConnection) Init() {
 	relpConn.state = STATE_CLOSED
 	relpConn.rxBufferSize = 512
 	relpConn.txBufferSize = 262144
-	relpConn.preAllocRxBuffer = bytes.NewBuffer(make([]byte, 0, 512))
-	relpConn.preAllocTxBuffer = bytes.NewBuffer(make([]byte, 0, 262144))
+	relpConn.preAllocRxBuffer = bytes.NewBuffer(make([]byte, 0, relpConn.rxBufferSize))
+	relpConn.preAllocTxBuffer = bytes.NewBuffer(make([]byte, 0, relpConn.txBufferSize))
+	relpConn.txId = 0 // sendBatch() increments this by one before sending
+	relpConn.window = &RelpWindow{}
+	relpConn.window.Init()
+	relpConn.offer = []byte("\nrelp_version=0\nrelp_software=RLP-05\ncommands=syslog\n")
 }
 
 // Connect connects to the specified RELP server and sends OPEN message to initialize the connection.
@@ -48,12 +52,9 @@ func (relpConn *RelpConnection) Connect(hostname string, port int) bool {
 		panic("Can't connect, the connection is not closed")
 	}
 
-	relpConn.txId = 0 // FIXME: 1 - 999,999,999 with loopback at end;; sendBatch() increments this by one before sending
-	relpConn.window = &RelpWindow{}
-	relpConn.window.Init()
 	netConn, netErr := net.Dial("tcp", fmt.Sprintf("%v:%v", hostname, port))
 	if netErr != nil {
-		log.Fatal("RelpConnection: Could not dial TCP at address ", hostname, port)
+		log.Fatal("RelpConnection: Could not dial TCP to address ", hostname, ":", port)
 	} else {
 		relpConn.connection = &netConn
 	}
@@ -63,8 +64,8 @@ func (relpConn *RelpConnection) Connect(hostname string, port int) bool {
 		RelpFrame{
 			transactionId: relpConn.txId,
 			cmd:           RELP_OPEN,
-			dataLength:    len([]byte(OFFER)),
-			data:          []byte(OFFER),
+			dataLength:    len(relpConn.offer),
+			data:          relpConn.offer,
 		},
 	}
 	openerBatch := RelpBatch{}
@@ -148,6 +149,12 @@ func (relpConn *RelpConnection) SendBatch(batch *RelpBatch) {
 		} else {
 			log.Printf("Sending request %v from batch\n", relpRequest)
 		}
+
+		// make sure txId loops 1 - 999 999 999
+		if relpConn.txId >= 999_999_999 {
+			relpConn.txId = 0
+		}
+
 		relpConn.txId += 1
 		relpRequest.transactionId = relpConn.txId
 
