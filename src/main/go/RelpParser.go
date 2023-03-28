@@ -121,7 +121,7 @@ func (parser *RelpParser) Parse(b byte) {
 			if parser.frameLenLeft == 0 {
 				// parsing done, no data left
 				parser.state = PS_NL
-				log.Printf("RelpParser: No bytes of data left to read. Read %v byte(s) total, (str: %v)",
+				log.Printf("RelpParser: No bytes of data left to read. Read %v byte(s) total, string: \n%v\n",
 					len(parser.frameData.Bytes()), string(parser.frameData.Bytes()))
 			}
 			break

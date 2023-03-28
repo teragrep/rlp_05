@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 	"strconv"
 )
@@ -17,7 +16,7 @@ const (
 )
 
 func (txFrame *RelpFrameTX) Write(byteBuf *bytes.Buffer) *bytes.Buffer {
-	log.Println("RelpFrameTX: Write to buffer")
+	log.Println("RelpFrameTX: Start writing to buffer...")
 	// transaction id
 	byteBuf.Write([]byte(strconv.FormatUint(txFrame.transactionId, 10)))
 	// command
@@ -31,9 +30,7 @@ func (txFrame *RelpFrameTX) Write(byteBuf *bytes.Buffer) *bytes.Buffer {
 	byteBuf.Write(txFrame.data)
 	byteBuf.WriteByte(NL)
 
-	//log.Printf("Wrote: %v to buffer", byteBuf.Bytes())
-	//log.Printf("RelpFrameTX.Write: %v", string(byteBuf.Bytes()))
-	fmt.Println(string(byteBuf.Bytes()))
+	log.Printf("RelpFrameTX: Wrote %v byte(s) to buffer, string:\n%v\n", byteBuf.Len(), string(byteBuf.Bytes()))
 
 	return byteBuf
 }

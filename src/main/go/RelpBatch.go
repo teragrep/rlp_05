@@ -3,6 +3,7 @@ package main
 import (
 	"container/list"
 	"errors"
+	"fmt"
 )
 
 type RelpBatch struct {
@@ -44,7 +45,7 @@ func (batch *RelpBatch) GetRequest(id uint64) (*RelpFrameTX, error) {
 	if ok {
 		return &v, nil
 	} else {
-		return nil, errors.New("could not find request in batch")
+		return nil, errors.New(fmt.Sprintf("could not find batch %v request", id))
 	}
 }
 
@@ -68,7 +69,7 @@ func (batch *RelpBatch) GetResponse(id uint64) (*RelpFrameRX, error) {
 	if ok {
 		return &v, nil
 	} else {
-		return nil, errors.New("could not get response from batch")
+		return nil, errors.New(fmt.Sprintf("could not find batch %v response", id))
 	}
 }
 
@@ -86,7 +87,7 @@ func (batch *RelpBatch) VerifyTransaction(id uint64) bool {
 		if hasResponse {
 			num, err := v.ParseResponseCode()
 			if err != nil {
-				panic("Could not parse response code from response!")
+				panic(fmt.Sprintf("Could not parse response code for transaction %v", id))
 			} else {
 				if num == 200 {
 					return true

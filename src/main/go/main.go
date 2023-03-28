@@ -4,8 +4,6 @@ import (
 	"fmt"
 )
 
-// TODO: Process ACKs in RelpConnection (needs RelpParser?)
-
 func main() {
 	relpSess := RelpConnection{}
 	relpSess.Init()
