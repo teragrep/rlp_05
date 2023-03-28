@@ -4,8 +4,11 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"log"
 )
 
+// RelpBatch struct contains all the request frames and their response counterparts.
+// the workQueue is used to keep track of the current, yet-to-be processed requests.
 type RelpBatch struct {
 	requests  map[uint64]RelpFrameTX
 	responses map[uint64]RelpFrameRX
@@ -13,6 +16,7 @@ type RelpBatch struct {
 	requestId uint64
 }
 
+// Init initializes the batch with new maps and list
 func (batch *RelpBatch) Init() {
 	batch.requests = make(map[uint64]RelpFrameTX)
 	batch.responses = make(map[uint64]RelpFrameRX)
@@ -20,18 +24,22 @@ func (batch *RelpBatch) Init() {
 	batch.requestId = 0
 }
 
+// Insert inserts the given byte array syslog message;
+// id SP syslog SP dataLength SP data NL
+// Works similarly to calling PutRequest with a syslog message request frame
 func (batch *RelpBatch) Insert(syslogMsg []byte) uint64 {
 	relpRequest := RelpFrameTX{
 		RelpFrame{
 			data:       syslogMsg,
 			dataLength: len(syslogMsg),
-			cmd:        "syslog",
+			cmd:        RELP_SYSLOG,
 		},
 	}
 
 	return batch.PutRequest(&relpRequest)
 }
 
+// PutRequest puts the given request frame to the requests map and work queue
 func (batch *RelpBatch) PutRequest(tx *RelpFrameTX) uint64 {
 	batch.requestId += 1
 	batch.requests[batch.requestId] = *tx
@@ -40,6 +48,8 @@ func (batch *RelpBatch) PutRequest(tx *RelpFrameTX) uint64 {
 	return batch.requestId
 }
 
+// GetRequest gets the request frame from the requests map, if found.
+// Otherwise will send a "could not find batch <id> request" error
 func (batch *RelpBatch) GetRequest(id uint64) (*RelpFrameTX, error) {
 	v, ok := batch.requests[id]
 	if ok {
@@ -49,6 +59,7 @@ func (batch *RelpBatch) GetRequest(id uint64) (*RelpFrameTX, error) {
 	}
 }
 
+// RemoveRequest removes the specified request from the map and work queue
 func (batch *RelpBatch) RemoveRequest(id uint64) {
 	// remove from requests map
 	delete(batch.requests, id)
@@ -64,6 +75,8 @@ func (batch *RelpBatch) RemoveRequest(id uint64) {
 	}
 }
 
+// GetResponse gets the specified request from the map, if found
+// Otherwise, returns "could not find batch <id> response" error
 func (batch *RelpBatch) GetResponse(id uint64) (*RelpFrameRX, error) {
 	v, ok := batch.responses[id]
 	if ok {
@@ -73,6 +86,7 @@ func (batch *RelpBatch) GetResponse(id uint64) (*RelpFrameRX, error) {
 	}
 }
 
+// PutResponse puts the specified response frame to the response map
 func (batch *RelpBatch) PutResponse(id uint64, response *RelpFrameRX) {
 	_, ok := batch.requests[id]
 	if ok {
@@ -80,25 +94,34 @@ func (batch *RelpBatch) PutResponse(id uint64, response *RelpFrameRX) {
 	}
 }
 
+// VerifyTransaction verifies, that the id given has a matching request and response frame saved,
+// and that the response code is 200 OK
 func (batch *RelpBatch) VerifyTransaction(id uint64) bool {
+	log.Printf("Verifying transaction %v\n", id)
 	_, hasRequest := batch.requests[id]
 	if hasRequest {
 		v, hasResponse := batch.responses[id]
 		if hasResponse {
+			log.Printf("Transaction %v has a request and response\n", id)
 			num, err := v.ParseResponseCode()
 			if err != nil {
 				panic(fmt.Sprintf("Could not parse response code for transaction %v", id))
 			} else {
 				if num == 200 {
+					log.Printf("Transaction %v successfully verified.\n", id)
 					return true
 				}
 			}
 		}
 	}
+	log.Printf("Transaction %v could not be verified successfully!\n", id)
 	return false
 }
 
+// VerifyTransactionAll goes through all requests and runs VerifyTransaction on all of them.
+// Returns false if any one of the transactions could not be verified, otherwise true.
 func (batch *RelpBatch) VerifyTransactionAll() bool {
+	log.Printf("Verifying ALL transactions\n")
 	for id := range batch.requests {
 		verified := batch.VerifyTransaction(id)
 		if !verified {
@@ -108,14 +131,20 @@ func (batch *RelpBatch) VerifyTransactionAll() bool {
 	return true
 }
 
+// RetryRequest retries sending the relp request frame by pushing it back
+// to the work queue
 func (batch *RelpBatch) RetryRequest(id uint64) {
+	log.Printf("Retrying: Pushing request %v back to work queue", id)
 	_, ok := batch.requests[id]
 	if ok {
 		batch.workQueue.PushBack(id)
 	}
 }
 
+// RetryAllFailed verifies all transactions, and adds all the failed-to-verify requests back
+// to the work queue
 func (batch *RelpBatch) RetryAllFailed() {
+	log.Printf("Verifying ALL transactions and retrying failed ones\n")
 	for id := range batch.requests {
 		verified := batch.VerifyTransaction(id)
 		if !verified {
@@ -124,10 +153,13 @@ func (batch *RelpBatch) RetryAllFailed() {
 	}
 }
 
+// GetWorkQueueLen gets the amount of requests in the work queue
 func (batch *RelpBatch) GetWorkQueueLen() int {
 	return batch.workQueue.Len()
 }
 
+// PopWorkQueue gets the front element from the work queue,
+// deletes it from the queue and returns the ID for that request frame
 func (batch *RelpBatch) PopWorkQueue() uint64 {
 	elem := batch.workQueue.Front()
 	id := elem.Value.(uint64)

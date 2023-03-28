@@ -5,10 +5,13 @@ import (
 	"strconv"
 )
 
+// RelpFrameRX is a struct containing the response frame
 type RelpFrameRX struct {
 	RelpFrame
 }
 
+// ParseResponseCode parses the response code as an integer from the request frame.
+// If parsing can't be done, returns 0 as the code and an error
 func (rxFrame *RelpFrameRX) ParseResponseCode() (int, error) {
 	var code = make([]byte, 3, 3)
 	for i, v := range rxFrame.data {

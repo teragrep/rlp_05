@@ -19,7 +19,7 @@ func TestConnection(t *testing.T) {
 	msgBatch := RelpBatch{}
 	msgBatch.Init()
 	msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-		cmd:        "syslog",
+		cmd:        RELP_SYSLOG,
 		dataLength: len([]byte("HelloThisIsAMessage")),
 		data:       []byte("HelloThisIsAMessage"),
 	}})

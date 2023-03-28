@@ -19,6 +19,8 @@ const (
 	STATE_COMMIT = 2
 )
 
+// RelpConnection struct contains the necessary fields to
+// manage a TCP connection to the RELP server
 type RelpConnection struct {
 	txId             uint64
 	rxBufferSize     int
@@ -30,6 +32,7 @@ type RelpConnection struct {
 	window           *RelpWindow
 }
 
+// Init initializes the connection struct with CLOSED state and allocates the TX/RX buffers
 func (relpConn *RelpConnection) Init() {
 	relpConn.state = STATE_CLOSED
 	relpConn.rxBufferSize = 512
@@ -38,6 +41,8 @@ func (relpConn *RelpConnection) Init() {
 	relpConn.preAllocTxBuffer = bytes.NewBuffer(make([]byte, 0, 262144))
 }
 
+// Connect connects to the specified RELP server and sends OPEN message to initialize the connection.
+// The returned boolean value specifies if the connection could be verified or not
 func (relpConn *RelpConnection) Connect(hostname string, port int) bool {
 	if relpConn.state != STATE_CLOSED {
 		panic("Can't connect, the connection is not closed")
@@ -57,7 +62,7 @@ func (relpConn *RelpConnection) Connect(hostname string, port int) bool {
 	relpRequest := RelpFrameTX{
 		RelpFrame{
 			transactionId: relpConn.txId,
-			cmd:           "open",
+			cmd:           RELP_OPEN,
 			dataLength:    len([]byte(OFFER)),
 			data:          []byte(OFFER),
 		},
@@ -78,6 +83,8 @@ func (relpConn *RelpConnection) Connect(hostname string, port int) bool {
 	return success
 }
 
+// TearDown closes the connection to the server.
+// The Disconnect method should be used instead.
 func (relpConn *RelpConnection) TearDown() {
 	var cn = *relpConn.connection
 	err := cn.Close()
@@ -87,13 +94,15 @@ func (relpConn *RelpConnection) TearDown() {
 	relpConn.state = STATE_CLOSED
 }
 
+// Disconnect sends the CLOSE message to the server, and tries to disconnect gracefully.
+// Calls the TearDown method if the CLOSE message was acknowledged by the server
 func (relpConn *RelpConnection) Disconnect() bool {
 	if relpConn.state != STATE_OPEN {
 		panic("Cannot disconnect, connection was not OPEN")
 	}
 	relpRequest := RelpFrameTX{RelpFrame{
 		transactionId: relpConn.txId,
-		cmd:           "close",
+		cmd:           RELP_CLOSE,
 		dataLength:    0,
 		data:          nil,
 	}}
@@ -110,17 +119,13 @@ func (relpConn *RelpConnection) Disconnect() bool {
 	}
 
 	if success {
-		var cn = *relpConn.connection
-		err := cn.Close()
-		if err != nil {
-			log.Println("Could not close connection in Disconnect method")
-		}
-		relpConn.state = STATE_CLOSED
+		relpConn.TearDown()
 	}
 
 	return success
 }
 
+// Commit commits the RELP batch to the server
 func (relpConn *RelpConnection) Commit(batch *RelpBatch) {
 	if relpConn.state != STATE_OPEN {
 		panic("Can't commit, connection was in state other than OPEN.")
@@ -131,6 +136,8 @@ func (relpConn *RelpConnection) Commit(batch *RelpBatch) {
 	relpConn.state = STATE_OPEN
 }
 
+// SendBatch sends the RELP frames to the server in the given batch.
+// The frames are sent asynchronously, and the server ACKs are checked after sending.
 func (relpConn *RelpConnection) SendBatch(batch *RelpBatch) {
 	// send a batch of requests
 	for batch.GetWorkQueueLen() > 0 {
@@ -153,6 +160,7 @@ func (relpConn *RelpConnection) SendBatch(batch *RelpBatch) {
 	relpConn.ReadAcks(batch)
 }
 
+// ReadAcks reads the ACKs from the given batch.
 func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) {
 	log.Printf("Reading ACKs for batchID: %v\n", batch.requestId)
 	var parser *RelpParser = nil
@@ -244,6 +252,7 @@ func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) {
 	log.Println("ReadAcks: done")
 }
 
+// SendRelpRequestAsync sends the RELP frame to the connected RELP server
 func (relpConn *RelpConnection) SendRelpRequestAsync(tx *RelpFrameTX) {
 	var buf *bytes.Buffer
 	if tx.dataLength > relpConn.txBufferSize {

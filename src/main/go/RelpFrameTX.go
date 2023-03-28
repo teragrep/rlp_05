@@ -6,6 +6,7 @@ import (
 	"strconv"
 )
 
+// RelpFrameTX is a struct containing a request RELP frame
 type RelpFrameTX struct {
 	RelpFrame
 }
@@ -15,6 +16,7 @@ const (
 	NL byte = 10 // byte for \n
 )
 
+// Write writes the frame to a relp message in the buffer
 func (txFrame *RelpFrameTX) Write(byteBuf *bytes.Buffer) *bytes.Buffer {
 	log.Println("RelpFrameTX: Start writing to buffer...")
 	// transaction id

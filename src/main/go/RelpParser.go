@@ -7,16 +7,19 @@ import (
 	"strings"
 )
 
+// constants, such as parser state (PS_ prefix) and max command length (MAX_CMD_LEN)
 const (
 	MAX_CMD_LEN = 11
-	// PS_TXN parser states
-	PS_TXN  = 0
-	PS_CMD  = 1
-	PS_LEN  = 2
-	PS_DATA = 3
-	PS_NL   = 4
+	PS_TXN      = 0
+	PS_CMD      = 1
+	PS_LEN      = 2
+	PS_DATA     = 3
+	PS_NL       = 4
 )
 
+// RelpParser contains the fields necessary for completing the response (RX)
+// parsing. The results of the parse operation can be found from the frameTxnId, frameCmdString, frameLen
+// and frameData fields.
 type RelpParser struct {
 	state            int
 	isComplete       bool
@@ -29,6 +32,8 @@ type RelpParser struct {
 	frameData        *bytes.Buffer
 }
 
+// Parse is used to parse the incoming response (RX).
+// It will populate the RelpParser struct's fields with the parsed data
 func (parser *RelpParser) Parse(b byte) {
 	switch parser.state {
 	case PS_TXN:

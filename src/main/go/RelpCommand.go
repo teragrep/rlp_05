@@ -1,5 +1,6 @@
 package main
 
+// contains all the RELP commands as constants
 const (
 	RELP_OPEN         = "open"
 	RELP_CLOSE        = "close"
