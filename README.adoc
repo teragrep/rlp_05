@@ -3,21 +3,19 @@
 
 Golang RELP library, allows the use of the RELP protocol in Golang
 
-Requirements: Go v1.19 or newer
+Tested on Go v1.19.
 
 == Basic usage
 
+Initializes a RELP connection, and verifies each batch.
 [,go]
 ----
 func main() {
-        // Create a relp connection to localhost:1601
-	relpSess := RelpConnection{}
+relpSess := RelpConnection{}
 	relpSess.Init()
-	relpSess.Connect("127.0.0.1", 1601)
-        // Create a RELP batch, and insert a frame to it
+
 	batch := RelpBatch{}
 	batch.Init()
-
 	batch.PutRequest(&RelpFrameTX{
 		RelpFrame{
 			cmd:        "syslog",
@@ -26,13 +24,41 @@ func main() {
 		},
 	})
 
-        // Commit the batch and disconnect gracefully
-	relpSess.Commit(&batch)
+    retry(&relpSess)
+
+	notDone := true
+	for notDone {
+		commitErr := relpSess.Commit(&batch)
+		if commitErr != nil {
+			log.Printf("Error committing batch: '%v'\n", commitErr.Error())
+		}
+
+		if !batch.VerifyTransactionAll() {
+			batch.RetryAllFailed()
+			retry(&relpSess)
+		} else {
+			notDone = false
+		}
+	}
+
 	relpSess.Disconnect()
 
+	fmt.Println(">>DONE<<")
 	// await for input, so the program doesn't exit
 	a := 0.0
 	fmt.Scanf("%f", &a)
+}
+
+func retry(relpSess *RelpConnection) {
+	relpSess.TearDown()
+	var cSuccess bool
+	var cErr error
+	cSuccess, cErr = relpSess.Connect("127.0.0.1", 1601)
+	for !cSuccess || cErr != nil {
+		relpSess.TearDown()
+		time.Sleep(5 * time.Second)
+		cSuccess, cErr = relpSess.Connect("127.0.0.1", 1601)
+	}
 }
 ----
 
@@ -45,15 +71,16 @@ func main() {
 |Can connect, receive and send messages
 
 |Error handling (timeouts)
-|Not implemented yet
+|Errors if ACK not received within 30sec, error reaches commit(&batch) call.
+Use batch.verifyTransactionAll() and .retryAllFailed() to check transactions after each batch's commit() call.
 
 |Unit testing
-|Not implemented yet
+|Implemented with external rlp_03 server jar
 
 |Documentation
-|TBD
+|Comments included. Should godoc be generated?
 
-|???
-|???
+|Dependencies
+|Testing dependent on included rlp_03 demo server jar
 |===
 
