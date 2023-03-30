@@ -43,7 +43,6 @@ func (parser *RelpParser) Parse(b byte) {
 				if err != nil {
 					log.Fatalln("RelpParser: Could not parse frameTxnId from string")
 				} else {
-					log.Printf("RelpParser: Got frameTxnId %v\n", num)
 					parser.frameTxnId = num
 					parser.state = PS_CMD
 				}
@@ -65,7 +64,6 @@ func (parser *RelpParser) Parse(b byte) {
 					strings.Compare(parser.frameCmdString, RELP_RSP) != 0 {
 					panic("RelpParser: Invalid command")
 				}
-				log.Printf("RelpParser: Got command string %v\n", parser.frameCmdString)
 			} else {
 				parser.frameCmdString += string(b)
 			}
@@ -80,7 +78,6 @@ func (parser *RelpParser) Parse(b byte) {
 					log.Fatalln("RelpParser: Could not parse frame length from string")
 				} else {
 					parser.frameLen = int(num)
-					log.Printf("RelpParser: Got frame len of %v\n", parser.frameLen)
 				}
 
 				if parser.frameLen < 0 {
@@ -119,15 +116,11 @@ func (parser *RelpParser) Parse(b byte) {
 			if parser.frameLenLeft > 0 {
 				parser.frameData.WriteByte(b)
 				parser.frameLenLeft -= 1
-				//log.Printf("RelpParser: Wrote %v to buffer (str: %v), %v byte(s) left...",
-				//b, string(b), parser.frameLenLeft)
 			}
 
 			if parser.frameLenLeft == 0 {
 				// parsing done, no data left
 				parser.state = PS_NL
-				log.Printf("RelpParser: No bytes of data left to read. Read %v byte(s) total, string: \n%v\n",
-					len(parser.frameData.Bytes()), string(parser.frameData.Bytes()))
 			}
 			break
 		}
@@ -136,7 +129,8 @@ func (parser *RelpParser) Parse(b byte) {
 			if b == '\n' {
 				// RELP msg always ends with NL
 				parser.isComplete = true
-				log.Println("RelpParser: NL was \\n, parser.isComplete=true")
+				log.Printf("RelpParser: Parser complete. Got: %v %v %v %v\n",
+					parser.frameTxnId, parser.frameCmdString, parser.frameLen, parser.frameData)
 			} else {
 				panic("RelpParser: Final byte was not NL")
 			}

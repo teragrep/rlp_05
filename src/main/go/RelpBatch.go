@@ -10,18 +10,18 @@ import (
 // RelpBatch struct contains all the request frames and their response counterparts.
 // the workQueue is used to keep track of the current, yet-to-be processed requests.
 type RelpBatch struct {
-	requests  map[uint64]RelpFrameTX
-	responses map[uint64]RelpFrameRX
+	requests  map[uint64]*RelpFrameTX
+	responses map[uint64]*RelpFrameRX
 	workQueue *list.List
 	requestId uint64
 }
 
 // Init initializes the batch with new maps and list
 func (batch *RelpBatch) Init() {
-	batch.requests = make(map[uint64]RelpFrameTX)
-	batch.responses = make(map[uint64]RelpFrameRX)
+	batch.requests = make(map[uint64]*RelpFrameTX)
+	batch.responses = make(map[uint64]*RelpFrameRX)
 	batch.workQueue = list.New()
-	batch.requestId = 0
+	batch.requestId = 0 // id within this batch
 }
 
 // Insert inserts the given byte array syslog message;
@@ -40,9 +40,11 @@ func (batch *RelpBatch) Insert(syslogMsg []byte) uint64 {
 }
 
 // PutRequest puts the given request frame to the requests map and work queue
+// batch.requestId is different from tx.transactionId
+// !!! requestId resets each batch but transactionId is the same for all for one relp session
 func (batch *RelpBatch) PutRequest(tx *RelpFrameTX) uint64 {
 	batch.requestId += 1
-	batch.requests[batch.requestId] = *tx
+	batch.requests[batch.requestId] = tx
 	batch.workQueue.PushBack(batch.requestId)
 
 	return batch.requestId
@@ -53,7 +55,7 @@ func (batch *RelpBatch) PutRequest(tx *RelpFrameTX) uint64 {
 func (batch *RelpBatch) GetRequest(id uint64) (*RelpFrameTX, error) {
 	v, ok := batch.requests[id]
 	if ok {
-		return &v, nil
+		return v, nil
 	} else {
 		return nil, errors.New(fmt.Sprintf("could not find batch %v request", id))
 	}
@@ -80,7 +82,7 @@ func (batch *RelpBatch) RemoveRequest(id uint64) {
 func (batch *RelpBatch) GetResponse(id uint64) (*RelpFrameRX, error) {
 	v, ok := batch.responses[id]
 	if ok {
-		return &v, nil
+		return v, nil
 	} else {
 		return nil, errors.New(fmt.Sprintf("could not find batch %v response", id))
 	}
@@ -90,20 +92,22 @@ func (batch *RelpBatch) GetResponse(id uint64) (*RelpFrameRX, error) {
 func (batch *RelpBatch) PutResponse(id uint64, response *RelpFrameRX) {
 	_, ok := batch.requests[id]
 	if ok {
-		batch.responses[id] = *response
+		batch.responses[id] = response
 	}
 }
 
 // VerifyTransaction verifies, that the id given has a matching request and response frame saved,
 // and that the response code is 200 OK
 func (batch *RelpBatch) VerifyTransaction(id uint64) bool {
-	log.Printf("Verifying transaction %v\n", id)
-	_, hasRequest := batch.requests[id]
+	log.Printf("Verifying transaction (batch-specific id, NOT txnId): %v\n", id)
+	req, hasRequest := batch.requests[id]
 	if hasRequest {
-		v, hasResponse := batch.responses[id]
+		log.Printf("Verify: Got request: %v\n", req)
+		resp, hasResponse := batch.responses[id]
 		if hasResponse {
+			log.Printf("Verify: Got response: %v\n", resp)
 			log.Printf("Transaction %v has a request and response\n", id)
-			num, err := v.ParseResponseCode()
+			num, err := resp.ParseResponseCode()
 			if err != nil {
 				panic(fmt.Sprintf("Could not parse response code for transaction %v", id))
 			} else {

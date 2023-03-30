@@ -12,7 +12,7 @@ import (
 func TestConnection(t *testing.T) {
 	sess := RelpConnection{}
 	sess.Init()
-	ok := sess.Connect("127.0.0.1", 1601)
+	ok, _ := sess.Connect("127.0.0.1", 1601)
 
 	if !ok {
 		t.Errorf("Connection was not successful! (success=%v); want true", ok)
@@ -50,7 +50,7 @@ func TestConnection(t *testing.T) {
 func TestConnectionMulti(t *testing.T) {
 	sess := RelpConnection{}
 	sess.Init()
-	ok := sess.Connect("127.0.0.1", 1601)
+	ok, _ := sess.Connect("127.0.0.1", 1601)
 
 	if !ok {
 		t.Errorf("Connection was not successful! (success=%v); want true", ok)
@@ -93,11 +93,14 @@ func TestConnectionMulti(t *testing.T) {
 func TestConnectionMultiBatch(t *testing.T) {
 	sess := RelpConnection{}
 	sess.Init()
-	ok := sess.Connect("127.0.0.1", 1601)
+	ok, _ := sess.Connect("127.0.0.1", 1601)
 
 	if !ok {
 		t.Errorf("Connection was not successful! (success=%v); want true", ok)
 	}
+
+	//fmt.Println("Waiting 5 secs before continuing")
+	//time.Sleep(5 * time.Second)
 
 	for i := 0; i < 3; i++ {
 		syslogMsg := []byte("HelloThisIsAMessage" + strconv.FormatInt(int64(i), 10))

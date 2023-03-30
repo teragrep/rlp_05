@@ -17,22 +17,28 @@ const (
 )
 
 // Write writes the frame to a relp message in the buffer
-func (txFrame *RelpFrameTX) Write(byteBuf *bytes.Buffer) *bytes.Buffer {
+func (txFrame *RelpFrameTX) Write() ([]byte, int) {
+	byteBuf := bytes.NewBuffer(make([]byte, 0, txFrame.dataLength+64))
+	bytesWritten := 0
 	log.Println("RelpFrameTX: Start writing to buffer...")
 	// transaction id
-	byteBuf.Write([]byte(strconv.FormatUint(txFrame.transactionId, 10)))
+	idBytes := []byte(strconv.FormatUint(txFrame.transactionId, 10))
+	byteBuf.Write(idBytes)
 	// command
 	byteBuf.WriteByte(SP)
-	byteBuf.Write([]byte(txFrame.cmd))
+	cmdBytes := []byte(txFrame.cmd)
+	byteBuf.Write(cmdBytes)
 	// data length
 	byteBuf.WriteByte(SP)
-	byteBuf.Write([]byte(strconv.FormatUint(uint64(txFrame.dataLength), 10)))
+	dataLenBytes := []byte(strconv.FormatUint(uint64(txFrame.dataLength), 10))
+	byteBuf.Write(dataLenBytes)
 	// data
 	byteBuf.WriteByte(SP)
 	byteBuf.Write(txFrame.data)
 	byteBuf.WriteByte(NL)
 
-	log.Printf("RelpFrameTX: Wrote %v byte(s) to buffer, string:\n%v\n", byteBuf.Len(), string(byteBuf.Bytes()))
+	bytesWritten = len(idBytes) + len(cmdBytes) + len(dataLenBytes) + txFrame.dataLength + 4
+	log.Printf("RelpFrameTX: Wrote %v byte(s) to buffer\n", bytesWritten)
 
-	return byteBuf
+	return byteBuf.Bytes(), bytesWritten
 }

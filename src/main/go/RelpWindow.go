@@ -1,8 +1,11 @@
 package main
 
-import "errors"
+import (
+	"errors"
+	"log"
+)
 
-// RelpWindow is a struct that contains all the ids (transaction-request) mapped
+// RelpWindow is a struct that contains all the ids (frame id->frame?) mapped
 // As the "pending" name suggests, they are the transactions still in progress
 type RelpWindow struct {
 	pending map[uint64]uint64
@@ -16,6 +19,10 @@ func (win *RelpWindow) Init() *RelpWindow {
 
 // PutPending inserts an id-id pair to the map
 func (win *RelpWindow) PutPending(txnId, reqId uint64) {
+	it, has := win.pending[txnId]
+	if has {
+		log.Println("Pending had for txnId: ", txnId, it)
+	}
 	win.pending[txnId] = reqId
 }
 
