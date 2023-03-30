@@ -34,7 +34,6 @@ func main() {
 
 		if !batch.VerifyTransactionAll() {
 			batch.RetryAllFailed()
-			relpSess.window.Init()
 			retry(&relpSess)
 		} else {
 			notDone = false

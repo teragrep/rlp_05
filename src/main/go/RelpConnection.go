@@ -44,7 +44,6 @@ func (relpConn *RelpConnection) Init() {
 	relpConn.preAllocTxBuffer = bytes.NewBuffer(make([]byte, 0, relpConn.txBufferSize))
 	relpConn.txId = 0 // sendBatch() increments this by one before sending
 	relpConn.window = &RelpWindow{}
-	relpConn.window.Init()
 	relpConn.offer = []byte("\nrelp_version=0\nrelp_software=RLP-05\ncommands=syslog\n")
 	relpConn.ackTimeoutDuration = 30 * time.Second
 }
@@ -60,8 +59,9 @@ func (relpConn *RelpConnection) Connect(hostname string, port int) (bool, error)
 	relpConn.lastIp = hostname
 	relpConn.lastPort = port
 
-	// reset txId
+	// reset txId & relpWindow
 	relpConn.txId = 0
+	relpConn.window.Init()
 
 	netConn, netErr := net.Dial("tcp", fmt.Sprintf("%v:%v", hostname, port))
 	if netErr != nil {
