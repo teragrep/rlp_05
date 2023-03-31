@@ -17,28 +17,74 @@ const (
 )
 
 // Write writes the frame to a relp message in the buffer
-func (txFrame *RelpFrameTX) Write() ([]byte, int) {
-	byteBuf := bytes.NewBuffer(make([]byte, 0, txFrame.dataLength+64))
+func (txFrame *RelpFrameTX) Write(byteBuf *bytes.Buffer) (int, error) {
+	idBytes := []byte(strconv.FormatUint(txFrame.transactionId, 10))
+	cmdBytes := []byte(txFrame.cmd)
+	dataLenBytes := []byte(strconv.FormatUint(uint64(txFrame.dataLength), 10))
 	bytesWritten := 0
+
 	log.Println("RelpFrameTX: Start writing to buffer...")
 	// transaction id
-	idBytes := []byte(strconv.FormatUint(txFrame.transactionId, 10))
-	byteBuf.Write(idBytes)
-	// command
-	byteBuf.WriteByte(SP)
-	cmdBytes := []byte(txFrame.cmd)
-	byteBuf.Write(cmdBytes)
-	// data length
-	byteBuf.WriteByte(SP)
-	dataLenBytes := []byte(strconv.FormatUint(uint64(txFrame.dataLength), 10))
-	byteBuf.Write(dataLenBytes)
-	// data
-	byteBuf.WriteByte(SP)
-	byteBuf.Write(txFrame.data)
-	byteBuf.WriteByte(NL)
+	nId, errId := byteBuf.Write(idBytes)
+	if errId != nil {
+		return bytesWritten, errId
+	} else {
+		bytesWritten += nId
+	}
 
-	bytesWritten = len(idBytes) + len(cmdBytes) + len(dataLenBytes) + txFrame.dataLength + 4
+	errSp1 := byteBuf.WriteByte(SP)
+	if errSp1 != nil {
+		return bytesWritten, errSp1
+	} else {
+		bytesWritten += 1
+	}
+
+	// command
+	nCmd, errCmd := byteBuf.Write(cmdBytes)
+	if errCmd != nil {
+		return bytesWritten, errCmd
+	} else {
+		bytesWritten += nCmd
+	}
+
+	errSp2 := byteBuf.WriteByte(SP)
+	if errSp2 != nil {
+		return bytesWritten, errSp2
+	} else {
+		bytesWritten += 1
+	}
+
+	// data length
+	nLen, errLen := byteBuf.Write(dataLenBytes)
+	if errLen != nil {
+		return bytesWritten, errLen
+	} else {
+		bytesWritten += nLen
+	}
+
+	errSp3 := byteBuf.WriteByte(SP)
+	if errSp3 != nil {
+		return bytesWritten, errSp3
+	} else {
+		bytesWritten += 1
+	}
+
+	// data
+	nData, errData := byteBuf.Write(txFrame.data)
+	if errData != nil {
+		return bytesWritten, errData
+	} else {
+		bytesWritten += nData
+	}
+
+	errNl := byteBuf.WriteByte(NL)
+	if errNl != nil {
+		return bytesWritten, errNl
+	} else {
+		bytesWritten += 1
+	}
+
 	log.Printf("RelpFrameTX: Wrote %v byte(s) to buffer\n", bytesWritten)
 
-	return byteBuf.Bytes(), bytesWritten
+	return bytesWritten, nil
 }

@@ -305,6 +305,10 @@ func InitServerConnection() *exec.Cmd {
 		par = filepath.Dir(par)
 	}
 	jarLocation := par + "/resources/relp-server/java-relp-server-demo-jar-with-dependencies.jar"
+
+	if _, err := os.Stat(jarLocation); err != nil {
+		panic("No relp server jar found in " + jarLocation)
+	}
 	log.Printf("get relp server jar %v\n", jarLocation)
 
 	// run it

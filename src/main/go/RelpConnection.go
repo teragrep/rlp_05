@@ -21,10 +21,10 @@ const (
 // RelpConnection struct contains the necessary fields to
 // manage a TCP connection to the RELP server
 type RelpConnection struct {
-	txId               uint64
-	rxBufferSize       int
-	txBufferSize       int
-	preAllocTxBuffer   *bytes.Buffer
+	txId         uint64
+	rxBufferSize int
+	txBufferSize int
+	//preAllocTxBuffer   *bytes.Buffer
 	preAllocRxBuffer   *bytes.Buffer
 	connection         *net.Conn
 	state              int
@@ -41,7 +41,7 @@ func (relpConn *RelpConnection) Init() {
 	relpConn.rxBufferSize = 512
 	relpConn.txBufferSize = 262144
 	relpConn.preAllocRxBuffer = bytes.NewBuffer(make([]byte, 0, relpConn.rxBufferSize))
-	relpConn.preAllocTxBuffer = bytes.NewBuffer(make([]byte, 0, relpConn.txBufferSize))
+	//relpConn.preAllocTxBuffer = bytes.NewBuffer(make([]byte, 0, relpConn.txBufferSize))
 	relpConn.txId = 0 // sendBatch() increments this by one before sending
 	relpConn.window = &RelpWindow{}
 	relpConn.offer = []byte("\nrelp_version=0\nrelp_software=RLP-05\ncommands=syslog\n")
@@ -181,8 +181,8 @@ func (relpConn *RelpConnection) SendBatch(batch *RelpBatch) error {
 		log.Println("SendBatch> Put pending: ", relpConn.txId, reqId)
 
 		go func() {
-			err := relpConn.SendRelpRequestAsync(relpRequest)
-			if err != nil {
+			sendErr := relpConn.SendRelpRequest(relpRequest)
+			if sendErr != nil {
 				log.Printf("Error sending relp request: '%v'\n", err.Error())
 			}
 		}()
@@ -284,29 +284,19 @@ func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) error {
 	return nil
 }
 
-// SendRelpRequestAsync sends the RELP frame to the connected RELP server
-func (relpConn *RelpConnection) SendRelpRequestAsync(tx *RelpFrameTX) error {
-	var buf *bytes.Buffer
-	if tx.dataLength > relpConn.txBufferSize {
-		buf = bytes.NewBuffer(make([]byte, 0, tx.dataLength))
-		relpConn.preAllocTxBuffer = buf
-		relpConn.txBufferSize = buf.Cap()
-	} else {
-		buf = relpConn.preAllocTxBuffer
-	}
+// SendRelpRequest sends the RELP frame to the connected RELP server
+func (relpConn *RelpConnection) SendRelpRequest(tx *RelpFrameTX) error {
+	buf := bytes.NewBuffer(make([]byte, 0, relpConn.txBufferSize))
 
-	// FIXME: seems like timeouts and such can make the buffer have multiple messages,
-	//  should the bytes be taken in some other way instead of Bytes(),
-	//  maybe indices (->currently trying byte array)
-	txBytes, txN := tx.Write()
+	txN, err := tx.Write(buf)
+
 	var cn = *relpConn.connection
-	n, err := cn.Write(txBytes[0:txN])
+	n, err := cn.Write(buf.Bytes()[0:txN])
 	if err != nil {
 		return err
 	} else {
 		log.Println("SendRelpRequest>", n, "bytes written to server")
 	}
 
-	buf.Reset()
 	return nil
 }
