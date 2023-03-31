@@ -1,9 +1,9 @@
 [#_rlp_05]
-= RLP_05
+= rlp_05
 
-Golang RELP library, allows the use of the RELP protocol in Golang
+Golang RELP library, allows the use of the RELP protocol in Golang.
 
-Tested on Go v1.19.
+Tested with Go v1.19.
 
 == Basic usage
 
@@ -62,25 +62,34 @@ func retry(relpSess *RelpConnection) {
 }
 ----
 
-== TODO
+== Interface
 
 |===
-|Feature |Status
+|Method or field |Information
 
-|Basic RELP connection
-|Can connect, receive and send messages
+|RelpConnection.Connect(hostname, port)
+|Initializes a TCP connection to the provided hostname:port address.
 
-|Error handling (timeouts)
-|Errors if ACK not received within 30sec, error reaches commit(&batch) call.
-Use batch.verifyTransactionAll() and .retryAllFailed() to check transactions after each batch's commit() call.
+|RelpConnection.ackTimeoutDuration
+|Duration, which the connection waits for a new ACK. Timeout will return error to RelpConnection.Commit() call.
+Default is 30 seconds.
 
-|Unit testing
-|Implemented with external rlp_03 server jar
+|RelpConnection.Commit(batch)
+|Sends the RelpBatch given as the argument to the established RELP connection.
 
-|Documentation
-|Comments included. Should godoc be generated?
+|RelpConnection.Disconnect()
+|Gracefully disconnects from the server.
 
-|Dependencies
-|Testing dependent on included rlp_03 demo server jar
+|RelpConnection.TearDown()
+|Forcefully disconnects from the server.
+
+|RelpBatch.PutRequest(RelpFrameTX)
+|Inserts a relp frame to the batch
+
+|RelpBatch.VerifyTransactionAll()
+|Verifies that all transactions got acknowledged by the server. Returns boolean.
+
+|RelpBatch.RetryAllFailed()
+|Adds all transactions back to the working queue. Restart the connection with tearDown+connect to try again.
 |===
 
