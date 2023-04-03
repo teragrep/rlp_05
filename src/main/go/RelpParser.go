@@ -71,7 +71,7 @@ func (parser *RelpParser) Parse(b byte) {
 		}
 	case PS_LEN:
 		{
-			// librelp sometimes uses HEADER = TXNR SP CMD SP DATALEN LF instead of SP as last one
+			// when datalen=0, librelp may use NL instead of SP NL
 			if b == ' ' || b == '\n' {
 				num, err := strconv.ParseInt(parser.frameLenString, 10, 64)
 				if err != nil {

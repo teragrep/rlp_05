@@ -21,18 +21,19 @@ const (
 // RelpConnection struct contains the necessary fields to
 // manage a TCP connection to the RELP server
 type RelpConnection struct {
-	txId         uint64
-	rxBufferSize int
-	txBufferSize int
-	//preAllocTxBuffer   *bytes.Buffer
-	preAllocRxBuffer   *bytes.Buffer
-	connection         *net.Conn
-	state              int
-	window             *RelpWindow
-	offer              []byte
-	lastIp             string
-	lastPort           int
-	ackTimeoutDuration time.Duration
+	txId                 uint64
+	rxBufferSize         int
+	txBufferSize         int
+	preAllocTxBuffer     *bytes.Buffer
+	preAllocRxBuffer     *bytes.Buffer
+	connection           *net.Conn
+	state                int
+	window               *RelpWindow
+	offer                []byte
+	lastIp               string
+	lastPort             int
+	ackTimeoutDuration   time.Duration
+	writeTimeoutDuration time.Duration
 }
 
 // Init initializes the connection struct with CLOSED state and allocates the TX/RX buffers
@@ -41,11 +42,12 @@ func (relpConn *RelpConnection) Init() {
 	relpConn.rxBufferSize = 512
 	relpConn.txBufferSize = 262144
 	relpConn.preAllocRxBuffer = bytes.NewBuffer(make([]byte, 0, relpConn.rxBufferSize))
-	//relpConn.preAllocTxBuffer = bytes.NewBuffer(make([]byte, 0, relpConn.txBufferSize))
+	relpConn.preAllocTxBuffer = bytes.NewBuffer(make([]byte, 0, relpConn.txBufferSize))
 	relpConn.txId = 0 // sendBatch() increments this by one before sending
 	relpConn.window = &RelpWindow{}
 	relpConn.offer = []byte("\nrelp_version=0\nrelp_software=RLP-05\ncommands=syslog\n")
 	relpConn.ackTimeoutDuration = 30 * time.Second
+	relpConn.writeTimeoutDuration = 30 * time.Second
 }
 
 // Connect connects to the specified RELP server and sends OPEN message to initialize the connection.
@@ -134,6 +136,7 @@ func (relpConn *RelpConnection) Disconnect() bool {
 	}
 
 	if success {
+		// if sending CLOSE command was successful, close connection and set state to CLOSED
 		relpConn.TearDown()
 	}
 
@@ -198,22 +201,25 @@ func (relpConn *RelpConnection) SendBatch(batch *RelpBatch) error {
 
 // ReadAcks reads the ACKs from the given batch.
 func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) error {
-	log.Printf("ReadAcks.Entry>Reading ACKs for batchID: %v\n", batch.requestId)
+	log.Printf("ReadAcks.Entry> Reading ACKs for batchID: %v\n", batch.requestId)
 	var parser *RelpParser = nil
 	notComplete := relpConn.window.Size() > 0
 	var cn = *relpConn.connection
 
-	for notComplete {
-		tmp := make([]byte, 64)
+	for notComplete { // until window is empty
+		tmp := make([]byte, 1)
 		readBytes := 0
-		for {
-			n, err := cn.Read(tmp)
+		for { // until parse complete
+			if parser == nil {
+				parser = &RelpParser{}
+			}
 
-			err2 := cn.SetReadDeadline(time.Now().Add(relpConn.ackTimeoutDuration))
-			if err2 != nil {
+			errDl := cn.SetReadDeadline(time.Now().Add(relpConn.ackTimeoutDuration))
+			if errDl != nil {
 				return errors.New("error setting connection timeout")
 			}
 
+			n, err := cn.Read(tmp)
 			if err != nil {
 				if errors.Is(err, os.ErrDeadlineExceeded) {
 					// reading timed out
@@ -226,59 +232,39 @@ func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) error {
 				}
 			}
 
-			// write and break if line break encountered
-			relpConn.preAllocRxBuffer.Write(tmp[0:n])
 			readBytes += n
-			if tmp[n-1] == '\n' {
-				break
-			}
-		}
 
-		parsedBytes := 0
-		if readBytes > 0 {
-			log.Printf("ReadAcks> Read %v byte(s) as ACK\n", readBytes)
-			for parsedBytes < readBytes {
-				if parser == nil {
-					parser = &RelpParser{}
+			log.Printf("Parsing byte: %v (str: %v)", tmp[0], string(tmp[0]))
+			parser.Parse(tmp[0])
+
+			if parser.isComplete {
+				log.Printf("ReadAcks> Parsing complete\n")
+				// resp read successfully
+				txnId := parser.frameTxnId
+				if relpConn.window.IsPending(txnId) {
+					reqId, err := relpConn.window.GetPending(txnId)
+					if err != nil {
+						panic("Could not find given pending txnId from RelpWindow!")
+					}
+					response := RelpFrameRX{
+						RelpFrame{
+							transactionId: parser.frameTxnId,
+							cmd:           parser.frameCmdString,
+							dataLength:    parser.frameLen,
+							data:          parser.frameData.Bytes(),
+						},
+					}
+					batch.PutResponse(reqId, &response)
+					relpConn.window.RemovePending(txnId)
 				}
 
-				nextBytes := relpConn.preAllocRxBuffer.Next(1) // len always 1
-				//log.Printf("Parsing byte: %v (str: %v)", nextBytes[0], string(nextBytes[0]))
-				parser.Parse(nextBytes[0])
-				parsedBytes++
-
-				if parser.isComplete {
-					log.Printf("ReadAcks> Parsing complete\n")
-					// resp read successfully
-					txnId := parser.frameTxnId
-					if relpConn.window.IsPending(txnId) {
-						reqId, err := relpConn.window.GetPending(txnId)
-						if err != nil {
-							panic("Could not find given pending txnId from RelpWindow!")
-						}
-						response := RelpFrameRX{
-							RelpFrame{
-								transactionId: parser.frameTxnId,
-								cmd:           parser.frameCmdString,
-								dataLength:    parser.frameLen,
-								data:          parser.frameData.Bytes(),
-							},
-						}
-						batch.PutResponse(reqId, &response)
-						relpConn.window.RemovePending(txnId)
-					}
-
-					parser = nil
-					if relpConn.window.Size() == 0 {
-						notComplete = false
-						break
-					}
+				parser = nil
+				if relpConn.window.Size() == 0 {
+					notComplete = false
+					break
 				}
-
 			}
 		}
-		// everything is read now
-		relpConn.preAllocRxBuffer.Reset()
 	}
 	log.Println("ReadAcks.Done> Return with no errors")
 	return nil
@@ -291,6 +277,11 @@ func (relpConn *RelpConnection) SendRelpRequest(tx *RelpFrameTX) error {
 	txN, err := tx.Write(buf)
 
 	var cn = *relpConn.connection
+	dlErr := cn.SetWriteDeadline(time.Now().Add(relpConn.writeTimeoutDuration))
+	if dlErr != nil {
+		return dlErr
+	}
+
 	n, err := cn.Write(buf.Bytes()[0:txN])
 	if err != nil {
 		return err
