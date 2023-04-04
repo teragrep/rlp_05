@@ -25,7 +25,7 @@ type RelpConnection struct {
 	rxBufferSize         int
 	txBufferSize         int
 	preAllocTxBuffer     *bytes.Buffer
-	preAllocRxBuffer     *bytes.Buffer
+	preAllocRxBuffer     []byte
 	connection           *net.Conn
 	state                int
 	window               *RelpWindow
@@ -41,7 +41,7 @@ func (relpConn *RelpConnection) Init() {
 	relpConn.state = STATE_CLOSED
 	relpConn.rxBufferSize = 512
 	relpConn.txBufferSize = 262144
-	relpConn.preAllocRxBuffer = bytes.NewBuffer(make([]byte, 0, relpConn.rxBufferSize))
+	relpConn.preAllocRxBuffer = make([]byte, relpConn.rxBufferSize)
 	relpConn.preAllocTxBuffer = bytes.NewBuffer(make([]byte, 0, relpConn.txBufferSize))
 	relpConn.txId = 0 // sendBatch() increments this by one before sending
 	relpConn.window = &RelpWindow{}
@@ -67,7 +67,13 @@ func (relpConn *RelpConnection) Connect(hostname string, port int) (bool, error)
 
 	netConn, netErr := net.Dial("tcp", fmt.Sprintf("%v:%v", hostname, port))
 	if netErr != nil {
-		return false, errors.New(fmt.Sprintf("RelpConnection: Could not dial TCP to address %v:%v", hostname, port))
+		return false, &ConnectionEstablishmentError{
+			hostname:  hostname,
+			port:      port,
+			reason:    netErr.Error(),
+			encrypted: false,
+			protocol:  "tcp",
+		}
 	} else {
 		relpConn.connection = &netConn
 	}
@@ -158,8 +164,8 @@ func (relpConn *RelpConnection) Commit(batch *RelpBatch) error {
 // SendBatch sends the RELP frames to the server in the given batch.
 // The frames are sent asynchronously, and the server ACKs are checked after sending.
 func (relpConn *RelpConnection) SendBatch(batch *RelpBatch) error {
-	log.Printf("SendBatch.Entry> Work queue length: %v, Window.pending: %v : %v\n",
-		batch.GetWorkQueueLen(), len(relpConn.window.pending), relpConn.window.pending)
+	log.Printf("SendBatch.Entry> Batch workQueue: %v request(s), Pending requests in window: %v\n",
+		batch.GetWorkQueueLen(), len(relpConn.window.pending))
 	// send a batch of requests
 	for batch.GetWorkQueueLen() > 0 {
 		reqId := batch.PopWorkQueue()
@@ -183,19 +189,18 @@ func (relpConn *RelpConnection) SendBatch(batch *RelpBatch) error {
 		relpConn.window.PutPending(relpConn.txId, reqId)
 		log.Println("SendBatch> Put pending: ", relpConn.txId, reqId)
 
-		go func() {
-			sendErr := relpConn.SendRelpRequest(relpRequest)
-			if sendErr != nil {
-				log.Printf("Error sending relp request: '%v'\n", err.Error())
-			}
-		}()
+		sendErr := relpConn.SendRelpRequest(relpRequest)
+		if sendErr != nil {
+			log.Printf("Error sending relp request: '%v'\n", err.Error())
+		}
+
+		ackErr := relpConn.ReadAcks(batch)
+		if ackErr != nil {
+			// ACK timeout or other failure
+			return ackErr
+		}
 	}
 
-	ackErr := relpConn.ReadAcks(batch)
-	if ackErr != nil {
-		// ACK timeout or other failure
-		return ackErr
-	}
 	return nil
 }
 
@@ -207,38 +212,43 @@ func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) error {
 	var cn = *relpConn.connection
 
 	for notComplete { // until window is empty
-		tmp := make([]byte, 1)
 		readBytes := 0
 		for { // until parse complete
 			if parser == nil {
 				parser = &RelpParser{}
 			}
 
+			// set ACK timeout duration, default 30 sec
 			errDl := cn.SetReadDeadline(time.Now().Add(relpConn.ackTimeoutDuration))
 			if errDl != nil {
 				return errors.New("error setting connection timeout")
 			}
 
-			n, err := cn.Read(tmp)
+			n, err := cn.Read(relpConn.preAllocRxBuffer)
 			if err != nil {
 				if errors.Is(err, os.ErrDeadlineExceeded) {
 					// reading timed out
-					return errors.New("reading ACK timed out")
+					return &AckReadingError{reason: "timeout"}
 				} else if err == io.EOF {
-					return errors.New("encountered EOF in ACK (no connection?)")
+					return &AckReadingError{reason: "eof"}
 				} else {
 					// other error
-					return errors.New("unexpected error reading ACK")
+					return &AckReadingError{reason: "unexpected error: " + err.Error()}
+				}
+			} else {
+				readBytes += n
+			}
+
+			// parse all bytes in buffer
+			for i := 0; i < n; i++ {
+				parseErr := parser.Parse(relpConn.preAllocRxBuffer[i])
+				if parseErr != nil {
+					panic("parsing error: " + parseErr.Error())
 				}
 			}
 
-			readBytes += n
-
-			log.Printf("Parsing byte: %v (str: %v)", tmp[0], string(tmp[0]))
-			parser.Parse(tmp[0])
-
 			if parser.isComplete {
-				log.Printf("ReadAcks> Parsing complete\n")
+				log.Printf("ReadAcks> Parsing complete, with %v byte(s) read\n", readBytes)
 				// resp read successfully
 				txnId := parser.frameTxnId
 				if relpConn.window.IsPending(txnId) {
@@ -260,11 +270,13 @@ func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) error {
 
 				parser = nil
 				if relpConn.window.Size() == 0 {
+					// window empty, can exit readAcks method
 					notComplete = false
-					break
 				}
+				break
 			}
 		}
+
 	}
 	log.Println("ReadAcks.Done> Return with no errors")
 	return nil
@@ -272,9 +284,7 @@ func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) error {
 
 // SendRelpRequest sends the RELP frame to the connected RELP server
 func (relpConn *RelpConnection) SendRelpRequest(tx *RelpFrameTX) error {
-	buf := bytes.NewBuffer(make([]byte, 0, relpConn.txBufferSize))
-
-	txN, err := tx.Write(buf)
+	txN, err := tx.Write(relpConn.preAllocTxBuffer)
 
 	var cn = *relpConn.connection
 	dlErr := cn.SetWriteDeadline(time.Now().Add(relpConn.writeTimeoutDuration))
@@ -282,12 +292,14 @@ func (relpConn *RelpConnection) SendRelpRequest(tx *RelpFrameTX) error {
 		return dlErr
 	}
 
-	n, err := cn.Write(buf.Bytes()[0:txN])
+	n, err := cn.Write(relpConn.preAllocTxBuffer.Bytes())
 	if err != nil {
 		return err
 	} else {
-		log.Println("SendRelpRequest>", n, "bytes written to server")
+		log.Printf("SendRelpRequest> Total of %v byte(s) written to server from %v given byte(s). (%v%%)",
+			n, txN, (1.00*n/txN)*100.0)
 	}
 
+	relpConn.preAllocTxBuffer.Reset()
 	return nil
 }

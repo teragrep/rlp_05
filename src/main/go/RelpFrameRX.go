@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"strconv"
 )
 
@@ -18,21 +17,21 @@ func (rxFrame *RelpFrameRX) ParseResponseCode() (int, error) {
 		if i == 3 && v == ' ' {
 			num, err := strconv.ParseInt(string(code), 10, 64)
 			if err != nil {
-				return 0, errors.New("relpFrameRX: could not parse response code")
+				return 0, &ResponseCodeParsingError{reason: "error parsing number from string to int64"}
 			} else {
 				return int(num), nil
 			}
 		} else if i >= 3 {
-			return 0, errors.New("relpFrameRX: unexpected error code length: longer than 3 numbers")
+			return 0, &ResponseCodeParsingError{reason: "response code was longer than 3 numbers; want <= 3"}
 		}
 
 		if v >= 48 && v <= 57 {
 			//0-9 ascii
 			code[i] = v
 		} else {
-			return 0, errors.New("relpFrameRX: response code had a non-number ascii char")
+			return 0, &ResponseCodeParsingError{reason: "encountered non-number ASCII char in response code"}
 		}
 	}
 
-	return 0, errors.New("relpFrameRX: response code could not be found")
+	return 0, &ResponseCodeParsingError{reason: "response code could not been found"}
 }

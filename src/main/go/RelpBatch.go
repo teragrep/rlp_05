@@ -102,10 +102,10 @@ func (batch *RelpBatch) VerifyTransaction(id uint64) bool {
 	log.Printf("Verifying transaction (batch-specific id, NOT txnId): %v\n", id)
 	req, hasRequest := batch.requests[id]
 	if hasRequest {
-		log.Printf("Verify: Got request: %v\n", req)
+		log.Printf("Verify: Got request: %v %v %v %v\n", req.transactionId, req.cmd, req.dataLength, string(req.data))
 		resp, hasResponse := batch.responses[id]
 		if hasResponse {
-			log.Printf("Verify: Got response: %v\n", resp)
+			log.Printf("Verify: Got response: %v %v %v %v\n", resp.transactionId, resp.cmd, resp.dataLength, string(resp.data))
 			log.Printf("Transaction %v has a request and response\n", id)
 			num, err := resp.ParseResponseCode()
 			if err != nil {

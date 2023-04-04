@@ -54,6 +54,7 @@ func retry(relpSess *RelpConnection) {
 	var cErr error
 	cSuccess, cErr = relpSess.Connect("127.0.0.1", 1601)
 	for !cSuccess || cErr != nil {
+		fmt.Println(cErr.Error())
 		relpSess.TearDown()
 		time.Sleep(5 * time.Second)
 		cSuccess, cErr = relpSess.Connect("127.0.0.1", 1601)

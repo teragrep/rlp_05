@@ -12,11 +12,11 @@ import (
 	"time"
 )
 
-// TestConnection: Sends OPEN->SYSLOG->CLOSE messages.
+// TestSingleMessage: Sends OPEN->SYSLOG->CLOSE messages.
 // Checks for window (pending) to be empty and also that the batch's workQueue is empty.
 // Meaning all pending operations have been verified
-func TestConnection(t *testing.T) {
-	relpServer := InitServerConnection()
+func TestSingleMessage(t *testing.T) {
+	relpServer := initServerConnection()
 	time.Sleep(time.Second)
 	// server ok, actual test
 
@@ -63,11 +63,11 @@ func TestConnection(t *testing.T) {
 	}
 }
 
-// TestConnectionMulti: Sends OPEN->SYSLOG->SYSLOG->SYSLOG->CLOSE messages.
+// TestMultipleMessage: Sends OPEN->SYSLOG->SYSLOG->SYSLOG->CLOSE messages.
 // Checks for window (pending) to be empty and also that the batch's workQueue is empty.
 // Meaning all pending operations have been verified
-func TestConnectionMulti(t *testing.T) {
-	relpServer := InitServerConnection()
+func TestMultipleMessage(t *testing.T) {
+	relpServer := initServerConnection()
 	time.Sleep(time.Second)
 	// server ok, actual test
 	sess := RelpConnection{}
@@ -118,11 +118,11 @@ func TestConnectionMulti(t *testing.T) {
 	}
 }
 
-// TestConnectionMulti: Sends OPEN->SYSLOG(m.)->SYSLOG->SYSLOG(m.)->CLOSE messages.
+// TestMultiMessageBatch: Sends OPEN->SYSLOG(3x)->SYSLOG->SYSLOG(3x)->CLOSE messages.
 // Checks for window (pending) to be empty and also that the batch's workQueue is empty.
 // Meaning all pending operations have been verified
-func TestConnectionMultiBatch(t *testing.T) {
-	relpServer := InitServerConnection()
+func TestMultiMessageBatch(t *testing.T) {
+	relpServer := initServerConnection()
 	time.Sleep(time.Second)
 	// server ok, actual test
 	sess := RelpConnection{}
@@ -192,12 +192,12 @@ func TestConnectionMultiBatch(t *testing.T) {
 	}
 }
 
-// TestConnectionHandleDisconnect: Sends OPEN->SYSLOG(m.)->SYSLOG->SYSLOG(m.)->CLOSE messages,
+// TestMultiMessageBatchWithDisconnect: Sends OPEN->SYSLOG(3x)->SYSLOG->SYSLOG(3x)->CLOSE messages,
 // with a server disconnect in between.
 // Checks for window (pending) to be empty and also that the batch's workQueue is empty.
 // Meaning all pending operations have been verified
-func TestConnectionHandleDisconnect(t *testing.T) {
-	relpServer := InitServerConnection()
+func TestMultiMessageBatchWithDisconnect(t *testing.T) {
+	relpServer := initServerConnection()
 	time.Sleep(time.Second)
 
 	// server ok, actual test
@@ -224,7 +224,7 @@ func TestConnectionHandleDisconnect(t *testing.T) {
 					t.Errorf("Could not kill server\n")
 				}
 				time.Sleep(2 * time.Second)
-				relpServer = InitServerConnection()
+				relpServer = initServerConnection()
 			}()
 		}
 
@@ -282,20 +282,25 @@ func TestConnectionHandleDisconnect(t *testing.T) {
 	fmt.Println("done")
 }
 
-// utils
+// Utils for testing
+
+// retryRelpConnection disconnects and attempts to reconnect to the server every 5 seconds until succeeds
 func retryRelpConnection(relpSess *RelpConnection) {
 	relpSess.TearDown()
 	var cSuccess bool
 	var cErr error
 	cSuccess, cErr = relpSess.Connect("127.0.0.1", 1601)
 	for !cSuccess || cErr != nil {
+		log.Println(cErr)
 		relpSess.TearDown()
 		time.Sleep(5 * time.Second)
 		cSuccess, cErr = relpSess.Connect("127.0.0.1", 1601)
 	}
 }
 
-func InitServerConnection() *exec.Cmd {
+// initServerConnection initializes the relp server using a Java-based relp server
+// the java demo relp server is hardcoded to run on 127.0.0.1:1601
+func initServerConnection() *exec.Cmd {
 	ready := make(chan int, 1)
 
 	// get relp server jar
