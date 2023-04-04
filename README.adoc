@@ -1,0 +1,95 @@
+[#_rlp_05]
+= rlp_05
+
+Golang RELP library, allows the use of the RELP protocol in Golang.
+
+Tested with Go v1.19.
+
+== Basic usage
+
+Initializes a RELP connection, and verifies each batch.
+[,go]
+----
+func main() {
+    relpSess := RelpConnection{}
+    relpSess.Init()
+
+    batch := RelpBatch{}
+    batch.Init()
+    batch.PutRequest(&RelpFrameTX{
+        RelpFrame{
+            cmd:        "syslog",
+            dataLength: len([]byte("HelloWorld")),
+            data:       []byte("HelloWorld"),
+        },
+    })
+
+    retry(&relpSess)
+
+    notDone := true
+    for notDone {
+        commitErr := relpSess.Commit(&batch)
+        if commitErr != nil {
+            log.Printf("Error committing batch: '%v'\n", commitErr.Error())
+        }
+
+        if !batch.VerifyTransactionAll() {
+            batch.RetryAllFailed()
+            retry(&relpSess)
+        } else {
+            notDone = false
+        }
+    }
+
+    relpSess.Disconnect()
+
+    fmt.Println(">>DONE<<")
+    // await for input, so the program doesn't exit
+    a := 0.0
+    fmt.Scanf("%f", &a)
+}
+
+func retry(relpSess *RelpConnection) {
+    relpSess.TearDown()
+    var cSuccess bool
+    var cErr error
+    cSuccess, cErr = relpSess.Connect("127.0.0.1", 1601)
+    for !cSuccess || cErr != nil {
+        relpSess.TearDown()
+        time.Sleep(5 * time.Second)
+        cSuccess, cErr = relpSess.Connect("127.0.0.1", 1601)
+    }
+}
+----
+
+== Interface
+
+|===
+|Method or field |Information
+
+|RelpConnection.Connect(hostname, port)
+|Initializes a TCP connection to the provided hostname:port address.
+
+|RelpConnection.ackTimeoutDuration
+|Duration, which the connection waits for a new ACK. Timeout will return error to RelpConnection.Commit() call.
+Default is 30 seconds.
+
+|RelpConnection.Commit(batch)
+|Sends the RelpBatch given as the argument to the established RELP connection.
+
+|RelpConnection.Disconnect()
+|Gracefully disconnects from the server.
+
+|RelpConnection.TearDown()
+|Forcefully disconnects from the server.
+
+|RelpBatch.PutRequest(RelpFrameTX)
+|Inserts a relp frame to the batch
+
+|RelpBatch.VerifyTransactionAll()
+|Verifies that all transactions got acknowledged by the server. Returns boolean.
+
+|RelpBatch.RetryAllFailed()
+|Adds all transactions back to the working queue. Restart the connection with tearDown+connect to try again.
+|===
+
