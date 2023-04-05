@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"os"
@@ -16,11 +17,11 @@ import (
 // Checks for window (pending) to be empty and also that the batch's workQueue is empty.
 // Meaning all pending operations have been verified
 func TestSingleMessage(t *testing.T) {
-	relpServer := initServerConnection()
+	relpServer := initServerConnection(false)
 	time.Sleep(time.Second)
 	// server ok, actual test
 
-	sess := RelpConnection{}
+	sess := RelpConnection{RelpDialer: &RelpPlainDialer{}}
 	sess.Init()
 	ok, _ := sess.Connect("127.0.0.1", 1601)
 
@@ -67,11 +68,68 @@ func TestSingleMessage(t *testing.T) {
 // Checks for window (pending) to be empty and also that the batch's workQueue is empty.
 // Meaning all pending operations have been verified
 func TestMultipleMessage(t *testing.T) {
-	relpServer := initServerConnection()
+	relpServer := initServerConnection(false)
 	time.Sleep(time.Second)
 	// server ok, actual test
-	sess := RelpConnection{}
+	sess := RelpConnection{RelpDialer: &RelpPlainDialer{}}
 	sess.Init()
+	ok, _ := sess.Connect("127.0.0.1", 1601)
+
+	if !ok {
+		t.Errorf("Connection was not successful! (success=%v); want true", ok)
+	}
+
+	for i := 0; i < 3; i++ {
+		syslogMsg := []byte("HelloThisIsAMessage" + strconv.FormatInt(int64(i), 10))
+		syslogMsgLen := len(syslogMsg)
+		msgBatch := RelpBatch{}
+		msgBatch.Init()
+		msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
+			cmd:        RELP_SYSLOG,
+			dataLength: syslogMsgLen,
+			data:       syslogMsg,
+		}})
+
+		err := sess.Commit(&msgBatch)
+		if err != nil {
+			t.Errorf("Error committing batch (err!=nil); want nil")
+		}
+
+		// batch queue empty
+		if msgBatch.GetWorkQueueLen() != 0 {
+			t.Errorf("RelpBatch.WorkQueue was not empty! (len=%v); want 0", msgBatch.GetWorkQueueLen())
+		}
+	}
+
+	disOk := sess.Disconnect()
+
+	if !disOk {
+		t.Errorf("Disconnection was not successful! (success=%v); want true", disOk)
+	}
+
+	// no stuff pending
+	if sess.window.Size() != 0 {
+		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.window.Size())
+	}
+
+	// kill server
+	err := relpServer.Process.Kill()
+	if err != nil {
+		t.Error("Could not kill server\n")
+	}
+}
+
+// TestMultipleMessageTLS: Sends OPEN->SYSLOG->SYSLOG->SYSLOG->CLOSE messages.
+// Checks for window (pending) to be empty and also that the batch's workQueue is empty.
+// Uses TLS encrypted connection.
+// Meaning all pending operations have been verified
+func TestMultipleMessageTLS(t *testing.T) {
+	relpServer := initServerConnection(true)
+	time.Sleep(time.Second)
+	// server ok, actual test
+	sess := RelpConnection{RelpDialer: &RelpTLSDialer{}}
+	sess.Init()
+	sess.tlsConfig = &tls.Config{InsecureSkipVerify: true}
 	ok, _ := sess.Connect("127.0.0.1", 1601)
 
 	if !ok {
@@ -122,10 +180,10 @@ func TestMultipleMessage(t *testing.T) {
 // Checks for window (pending) to be empty and also that the batch's workQueue is empty.
 // Meaning all pending operations have been verified
 func TestMultiMessageBatch(t *testing.T) {
-	relpServer := initServerConnection()
+	relpServer := initServerConnection(false)
 	time.Sleep(time.Second)
 	// server ok, actual test
-	sess := RelpConnection{}
+	sess := RelpConnection{RelpDialer: &RelpPlainDialer{}}
 	sess.Init()
 	ok, _ := sess.Connect("127.0.0.1", 1601)
 
@@ -197,11 +255,11 @@ func TestMultiMessageBatch(t *testing.T) {
 // Checks for window (pending) to be empty and also that the batch's workQueue is empty.
 // Meaning all pending operations have been verified
 func TestMultiMessageBatchWithDisconnect(t *testing.T) {
-	relpServer := initServerConnection()
+	relpServer := initServerConnection(false)
 	time.Sleep(time.Second)
 
 	// server ok, actual test
-	sess := RelpConnection{}
+	sess := RelpConnection{RelpDialer: &RelpPlainDialer{}}
 	sess.Init()
 	retryRelpConnection(&sess)
 
@@ -224,7 +282,98 @@ func TestMultiMessageBatchWithDisconnect(t *testing.T) {
 					t.Errorf("Could not kill server\n")
 				}
 				time.Sleep(2 * time.Second)
-				relpServer = initServerConnection()
+				relpServer = initServerConnection(false)
+			}()
+		}
+
+		// put 3 messages on batches 0 and 2, and 1 message on batch 1
+		if i != 1 {
+			msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
+				cmd:        RELP_SYSLOG,
+				dataLength: syslogMsgLen,
+				data:       syslogMsg,
+			}})
+			msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
+				cmd:        RELP_SYSLOG,
+				dataLength: syslogMsgLen,
+				data:       syslogMsg,
+			}})
+		}
+
+		notDone := true
+		for notDone {
+			commitErr := sess.Commit(&msgBatch)
+			if commitErr != nil {
+				log.Printf("Error committing batch: '%v'\n", commitErr.Error())
+			}
+
+			if !msgBatch.VerifyTransactionAll() {
+				msgBatch.RetryAllFailed()
+				retryRelpConnection(&sess)
+			} else {
+				notDone = false
+			}
+		}
+
+		// batch queue empty
+		if msgBatch.GetWorkQueueLen() != 0 {
+			t.Errorf("RelpBatch.WorkQueue was not empty! (len=%v); want 0", msgBatch.GetWorkQueueLen())
+		}
+	}
+
+	disOk := sess.Disconnect()
+
+	if !disOk {
+		t.Errorf("Disconnection was not successful! (success=%v); want true", disOk)
+	}
+
+	// no stuff pending
+	if sess.window.Size() != 0 {
+		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.window.Size())
+	}
+
+	// kill server
+	err2 := relpServer.Process.Kill()
+	if err2 != nil {
+		t.Errorf("Could not kill server\n")
+	}
+	fmt.Println("done")
+}
+
+// TestMultiMessageBatchWithDisconnectTLS: Sends OPEN->SYSLOG(3x)->SYSLOG->SYSLOG(3x)->CLOSE messages,
+// with a server disconnect in between using encrypted TLS connection
+// Checks for window (pending) to be empty and also that the batch's workQueue is empty.
+// Meaning all pending operations have been verified
+func TestMultiMessageBatchWithDisconnectTLS(t *testing.T) {
+	relpServer := initServerConnection(true)
+	time.Sleep(time.Second)
+
+	// server ok, actual test
+	sess := RelpConnection{RelpDialer: &RelpTLSDialer{}}
+	sess.Init()
+	sess.tlsConfig = &tls.Config{InsecureSkipVerify: true}
+	retryRelpConnection(&sess)
+
+	for i := 0; i < 3; i++ {
+		syslogMsg := []byte("HelloThisIsAMessage" + strconv.FormatInt(int64(i), 10))
+		syslogMsgLen := len(syslogMsg)
+		msgBatch := RelpBatch{}
+		msgBatch.Init()
+		msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
+			cmd:        RELP_SYSLOG,
+			dataLength: syslogMsgLen,
+			data:       syslogMsg,
+		}})
+
+		// kill server after first batch for 2 seconds
+		if i == 1 {
+			go func() {
+				err := relpServer.Process.Kill()
+				if err != nil {
+					t.Errorf("Could not kill server\n")
+				}
+				time.Sleep(2 * time.Second)
+				relpServer = initServerConnection(true)
 			}()
 		}
 
@@ -300,7 +449,7 @@ func retryRelpConnection(relpSess *RelpConnection) {
 
 // initServerConnection initializes the relp server using a Java-based relp server
 // the java demo relp server is hardcoded to run on 127.0.0.1:1601
-func initServerConnection() *exec.Cmd {
+func initServerConnection(tlsMode bool) *exec.Cmd {
 	ready := make(chan int, 1)
 
 	// get relp server jar
@@ -317,8 +466,14 @@ func initServerConnection() *exec.Cmd {
 	log.Printf("get relp server jar %v\n", jarLocation)
 
 	// run it
-	relpServer := exec.Command("/usr/bin/java",
-		"-jar", jarLocation)
+	var relpServer *exec.Cmd
+	if tlsMode {
+		relpServer = exec.Command("/usr/bin/java",
+			"-jar", jarLocation, "tls=true")
+	} else {
+		relpServer = exec.Command("/usr/bin/java",
+			"-jar", jarLocation)
+	}
 
 	// start in coroutine
 	go func() {
