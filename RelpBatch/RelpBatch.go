@@ -1,38 +1,40 @@
-package main
+package RelpBatch
 
 import (
 	"container/list"
 	"errors"
 	"fmt"
+	"github.com/teragrep/rlp_05/RelpCommand"
+	"github.com/teragrep/rlp_05/RelpFrame"
 	"log"
 )
 
 // RelpBatch struct contains all the request frames and their response counterparts.
 // the workQueue is used to keep track of the current, yet-to-be processed requests.
 type RelpBatch struct {
-	requests  map[uint64]*RelpFrameTX
-	responses map[uint64]*RelpFrameRX
+	requests  map[uint64]*RelpFrame.TX
+	responses map[uint64]*RelpFrame.RX
 	workQueue *list.List
-	requestId uint64
+	RequestId uint64
 }
 
 // Init initializes the batch with new maps and list
 func (batch *RelpBatch) Init() {
-	batch.requests = make(map[uint64]*RelpFrameTX)
-	batch.responses = make(map[uint64]*RelpFrameRX)
+	batch.requests = make(map[uint64]*RelpFrame.TX)
+	batch.responses = make(map[uint64]*RelpFrame.RX)
 	batch.workQueue = list.New()
-	batch.requestId = 0 // id within this batch
+	batch.RequestId = 0 // id within this batch
 }
 
 // Insert inserts the given byte array syslog message;
 // id SP syslog SP dataLength SP data NL
 // Works similarly to calling PutRequest with a syslog message request frame
 func (batch *RelpBatch) Insert(syslogMsg []byte) uint64 {
-	relpRequest := RelpFrameTX{
-		RelpFrame{
-			data:       syslogMsg,
-			dataLength: len(syslogMsg),
-			cmd:        RELP_SYSLOG,
+	relpRequest := RelpFrame.TX{
+		RelpFrame: RelpFrame.RelpFrame{
+			Data:       syslogMsg,
+			DataLength: len(syslogMsg),
+			Cmd:        RelpCommand.RELP_SYSLOG,
 		},
 	}
 
@@ -42,17 +44,17 @@ func (batch *RelpBatch) Insert(syslogMsg []byte) uint64 {
 // PutRequest puts the given request frame to the requests map and work queue
 // batch.requestId is different from tx.transactionId
 // !!! requestId resets each batch but transactionId is the same for all for one relp session
-func (batch *RelpBatch) PutRequest(tx *RelpFrameTX) uint64 {
-	batch.requestId += 1
-	batch.requests[batch.requestId] = tx
-	batch.workQueue.PushBack(batch.requestId)
+func (batch *RelpBatch) PutRequest(tx *RelpFrame.TX) uint64 {
+	batch.RequestId += 1
+	batch.requests[batch.RequestId] = tx
+	batch.workQueue.PushBack(batch.RequestId)
 
-	return batch.requestId
+	return batch.RequestId
 }
 
 // GetRequest gets the request frame from the requests map, if found.
 // Otherwise will send a "could not find batch <id> request" error
-func (batch *RelpBatch) GetRequest(id uint64) (*RelpFrameTX, error) {
+func (batch *RelpBatch) GetRequest(id uint64) (*RelpFrame.TX, error) {
 	v, ok := batch.requests[id]
 	if ok {
 		return v, nil
@@ -79,7 +81,7 @@ func (batch *RelpBatch) RemoveRequest(id uint64) {
 
 // GetResponse gets the specified request from the map, if found
 // Otherwise, returns "could not find batch <id> response" error
-func (batch *RelpBatch) GetResponse(id uint64) (*RelpFrameRX, error) {
+func (batch *RelpBatch) GetResponse(id uint64) (*RelpFrame.RX, error) {
 	v, ok := batch.responses[id]
 	if ok {
 		return v, nil
@@ -89,7 +91,7 @@ func (batch *RelpBatch) GetResponse(id uint64) (*RelpFrameRX, error) {
 }
 
 // PutResponse puts the specified response frame to the response map
-func (batch *RelpBatch) PutResponse(id uint64, response *RelpFrameRX) {
+func (batch *RelpBatch) PutResponse(id uint64, response *RelpFrame.RX) {
 	_, ok := batch.requests[id]
 	if ok {
 		batch.responses[id] = response
@@ -102,10 +104,10 @@ func (batch *RelpBatch) VerifyTransaction(id uint64) bool {
 	log.Printf("Verifying transaction (batch-specific id, NOT txnId): %v\n", id)
 	req, hasRequest := batch.requests[id]
 	if hasRequest {
-		log.Printf("Verify: Got request: %v %v %v %v\n", req.transactionId, req.cmd, req.dataLength, string(req.data))
+		log.Printf("Verify: Got request: %v %v %v %v\n", req.TransactionId, req.Cmd, req.DataLength, string(req.Data))
 		resp, hasResponse := batch.responses[id]
 		if hasResponse {
-			log.Printf("Verify: Got response: %v %v %v %v\n", resp.transactionId, resp.cmd, resp.dataLength, string(resp.data))
+			log.Printf("Verify: Got response: %v %v %v %v\n", resp.TransactionId, resp.Cmd, resp.DataLength, string(resp.Data))
 			log.Printf("Transaction %v has a request and response\n", id)
 			num, err := resp.ParseResponseCode()
 			if err != nil {

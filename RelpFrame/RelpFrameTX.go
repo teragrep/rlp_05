@@ -1,4 +1,4 @@
-package main
+package RelpFrame
 
 import (
 	"bytes"
@@ -6,8 +6,8 @@ import (
 	"strconv"
 )
 
-// RelpFrameTX is a struct containing a request RELP frame
-type RelpFrameTX struct {
+// TX RelpFrameTX is a struct containing a request RELP frame
+type TX struct {
 	RelpFrame
 }
 
@@ -17,10 +17,10 @@ const (
 )
 
 // Write writes the frame to a relp message in the buffer
-func (txFrame *RelpFrameTX) Write(byteBuf *bytes.Buffer) (int, error) {
-	idBytes := []byte(strconv.FormatUint(txFrame.transactionId, 10))
-	cmdBytes := []byte(txFrame.cmd)
-	dataLenBytes := []byte(strconv.FormatUint(uint64(txFrame.dataLength), 10))
+func (txFrame *TX) Write(byteBuf *bytes.Buffer) (int, error) {
+	idBytes := []byte(strconv.FormatUint(txFrame.TransactionId, 10))
+	cmdBytes := []byte(txFrame.Cmd)
+	dataLenBytes := []byte(strconv.FormatUint(uint64(txFrame.DataLength), 10))
 	bytesWritten := 0
 
 	log.Println("RelpFrameTX: Start writing to buffer...")
@@ -70,7 +70,7 @@ func (txFrame *RelpFrameTX) Write(byteBuf *bytes.Buffer) (int, error) {
 	}
 
 	// data
-	nData, errData := byteBuf.Write(txFrame.data)
+	nData, errData := byteBuf.Write(txFrame.Data)
 	if errData != nil {
 		return bytesWritten, errData
 	} else {

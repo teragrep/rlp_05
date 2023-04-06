@@ -1,8 +1,13 @@
-package main
+package test
 
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/teragrep/rlp_05/RelpBatch"
+	"github.com/teragrep/rlp_05/RelpCommand"
+	"github.com/teragrep/rlp_05/RelpConnection"
+	"github.com/teragrep/rlp_05/RelpDialer"
+	"github.com/teragrep/rlp_05/RelpFrame"
 	"log"
 	"os"
 	"os/exec"
@@ -21,7 +26,7 @@ func TestSingleMessage(t *testing.T) {
 	time.Sleep(time.Second)
 	// server ok, actual test
 
-	sess := RelpConnection{RelpDialer: &RelpPlainDialer{}}
+	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpPlainDialer{}}
 	sess.Init()
 	ok, _ := sess.Connect("127.0.0.1", 1601)
 
@@ -29,12 +34,12 @@ func TestSingleMessage(t *testing.T) {
 		t.Errorf("Connection was not successful! (success=%v); want true", ok)
 	}
 
-	msgBatch := RelpBatch{}
+	msgBatch := RelpBatch.RelpBatch{}
 	msgBatch.Init()
-	msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-		cmd:        RELP_SYSLOG,
-		dataLength: len([]byte("HelloThisIsAMessage")),
-		data:       []byte("HelloThisIsAMessage"),
+	msgBatch.PutRequest(&RelpFrame.TX{RelpFrame: RelpFrame.RelpFrame{
+		Cmd:        RelpCommand.RELP_SYSLOG,
+		DataLength: len([]byte("HelloThisIsAMessage")),
+		Data:       []byte("HelloThisIsAMessage"),
 	}})
 
 	err := sess.Commit(&msgBatch)
@@ -48,8 +53,8 @@ func TestSingleMessage(t *testing.T) {
 	}
 
 	// no stuff pending
-	if sess.window.Size() != 0 {
-		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.window.Size())
+	if sess.Window.Size() != 0 {
+		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.Window.Size())
 	}
 
 	// batch queue empty
@@ -71,7 +76,7 @@ func TestMultipleMessage(t *testing.T) {
 	relpServer := initServerConnection(false)
 	time.Sleep(time.Second)
 	// server ok, actual test
-	sess := RelpConnection{RelpDialer: &RelpPlainDialer{}}
+	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpPlainDialer{}}
 	sess.Init()
 	ok, _ := sess.Connect("127.0.0.1", 1601)
 
@@ -82,12 +87,12 @@ func TestMultipleMessage(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		syslogMsg := []byte("HelloThisIsAMessage" + strconv.FormatInt(int64(i), 10))
 		syslogMsgLen := len(syslogMsg)
-		msgBatch := RelpBatch{}
+		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-			cmd:        RELP_SYSLOG,
-			dataLength: syslogMsgLen,
-			data:       syslogMsg,
+		msgBatch.PutRequest(&RelpFrame.TX{RelpFrame: RelpFrame.RelpFrame{
+			Cmd:        RelpCommand.RELP_SYSLOG,
+			DataLength: syslogMsgLen,
+			Data:       syslogMsg,
 		}})
 
 		err := sess.Commit(&msgBatch)
@@ -108,8 +113,8 @@ func TestMultipleMessage(t *testing.T) {
 	}
 
 	// no stuff pending
-	if sess.window.Size() != 0 {
-		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.window.Size())
+	if sess.Window.Size() != 0 {
+		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.Window.Size())
 	}
 
 	// kill server
@@ -127,9 +132,9 @@ func TestMultipleMessageTLS(t *testing.T) {
 	relpServer := initServerConnection(true)
 	time.Sleep(time.Second)
 	// server ok, actual test
-	sess := RelpConnection{RelpDialer: &RelpTLSDialer{}}
+	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpTLSDialer{}}
 	sess.Init()
-	sess.tlsConfig = &tls.Config{InsecureSkipVerify: true}
+	sess.TlsConfig = &tls.Config{InsecureSkipVerify: true}
 	ok, _ := sess.Connect("127.0.0.1", 1601)
 
 	if !ok {
@@ -139,12 +144,12 @@ func TestMultipleMessageTLS(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		syslogMsg := []byte("HelloThisIsAMessage" + strconv.FormatInt(int64(i), 10))
 		syslogMsgLen := len(syslogMsg)
-		msgBatch := RelpBatch{}
+		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-			cmd:        RELP_SYSLOG,
-			dataLength: syslogMsgLen,
-			data:       syslogMsg,
+		msgBatch.PutRequest(&RelpFrame.TX{RelpFrame: RelpFrame.RelpFrame{
+			Cmd:        RelpCommand.RELP_SYSLOG,
+			DataLength: syslogMsgLen,
+			Data:       syslogMsg,
 		}})
 
 		err := sess.Commit(&msgBatch)
@@ -165,8 +170,8 @@ func TestMultipleMessageTLS(t *testing.T) {
 	}
 
 	// no stuff pending
-	if sess.window.Size() != 0 {
-		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.window.Size())
+	if sess.Window.Size() != 0 {
+		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.Window.Size())
 	}
 
 	// kill server
@@ -183,7 +188,7 @@ func TestMultiMessageBatch(t *testing.T) {
 	relpServer := initServerConnection(false)
 	time.Sleep(time.Second)
 	// server ok, actual test
-	sess := RelpConnection{RelpDialer: &RelpPlainDialer{}}
+	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpPlainDialer{}}
 	sess.Init()
 	ok, _ := sess.Connect("127.0.0.1", 1601)
 
@@ -197,25 +202,25 @@ func TestMultiMessageBatch(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		syslogMsg := []byte("HelloThisIsAMessage" + strconv.FormatInt(int64(i), 10))
 		syslogMsgLen := len(syslogMsg)
-		msgBatch := RelpBatch{}
+		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-			cmd:        RELP_SYSLOG,
-			dataLength: syslogMsgLen,
-			data:       syslogMsg,
+		msgBatch.PutRequest(&RelpFrame.TX{RelpFrame: RelpFrame.RelpFrame{
+			Cmd:        RelpCommand.RELP_SYSLOG,
+			DataLength: syslogMsgLen,
+			Data:       syslogMsg,
 		}})
 
 		// put 3 messages on batches 0 and 2, and 1 message on batch 1
 		if i != 1 {
-			msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-				cmd:        RELP_SYSLOG,
-				dataLength: syslogMsgLen,
-				data:       syslogMsg,
+			msgBatch.PutRequest(&RelpFrame.TX{RelpFrame: RelpFrame.RelpFrame{
+				Cmd:        RelpCommand.RELP_SYSLOG,
+				DataLength: syslogMsgLen,
+				Data:       syslogMsg,
 			}})
-			msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-				cmd:        RELP_SYSLOG,
-				dataLength: syslogMsgLen,
-				data:       syslogMsg,
+			msgBatch.PutRequest(&RelpFrame.TX{RelpFrame: RelpFrame.RelpFrame{
+				Cmd:        RelpCommand.RELP_SYSLOG,
+				DataLength: syslogMsgLen,
+				Data:       syslogMsg,
 			}})
 		}
 
@@ -239,8 +244,8 @@ func TestMultiMessageBatch(t *testing.T) {
 	}
 
 	// no stuff pending
-	if sess.window.Size() != 0 {
-		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.window.Size())
+	if sess.Window.Size() != 0 {
+		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.Window.Size())
 	}
 
 	// kill server
@@ -259,19 +264,19 @@ func TestMultiMessageBatchWithDisconnect(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// server ok, actual test
-	sess := RelpConnection{RelpDialer: &RelpPlainDialer{}}
+	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpPlainDialer{}}
 	sess.Init()
 	retryRelpConnection(&sess)
 
 	for i := 0; i < 3; i++ {
 		syslogMsg := []byte("HelloThisIsAMessage" + strconv.FormatInt(int64(i), 10))
 		syslogMsgLen := len(syslogMsg)
-		msgBatch := RelpBatch{}
+		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-			cmd:        RELP_SYSLOG,
-			dataLength: syslogMsgLen,
-			data:       syslogMsg,
+		msgBatch.PutRequest(&RelpFrame.TX{RelpFrame.RelpFrame{
+			Cmd:        RelpCommand.RELP_SYSLOG,
+			DataLength: syslogMsgLen,
+			Data:       syslogMsg,
 		}})
 
 		// kill server after first batch for 2 seconds
@@ -288,15 +293,15 @@ func TestMultiMessageBatchWithDisconnect(t *testing.T) {
 
 		// put 3 messages on batches 0 and 2, and 1 message on batch 1
 		if i != 1 {
-			msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-				cmd:        RELP_SYSLOG,
-				dataLength: syslogMsgLen,
-				data:       syslogMsg,
+			msgBatch.PutRequest(&RelpFrame.TX{RelpFrame.RelpFrame{
+				Cmd:        RelpCommand.RELP_SYSLOG,
+				DataLength: syslogMsgLen,
+				Data:       syslogMsg,
 			}})
-			msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-				cmd:        RELP_SYSLOG,
-				dataLength: syslogMsgLen,
-				data:       syslogMsg,
+			msgBatch.PutRequest(&RelpFrame.TX{RelpFrame.RelpFrame{
+				Cmd:        RelpCommand.RELP_SYSLOG,
+				DataLength: syslogMsgLen,
+				Data:       syslogMsg,
 			}})
 		}
 
@@ -328,8 +333,8 @@ func TestMultiMessageBatchWithDisconnect(t *testing.T) {
 	}
 
 	// no stuff pending
-	if sess.window.Size() != 0 {
-		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.window.Size())
+	if sess.Window.Size() != 0 {
+		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.Window.Size())
 	}
 
 	// kill server
@@ -349,20 +354,20 @@ func TestMultiMessageBatchWithDisconnectTLS(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// server ok, actual test
-	sess := RelpConnection{RelpDialer: &RelpTLSDialer{}}
+	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpTLSDialer{}}
 	sess.Init()
-	sess.tlsConfig = &tls.Config{InsecureSkipVerify: true}
+	sess.TlsConfig = &tls.Config{InsecureSkipVerify: true}
 	retryRelpConnection(&sess)
 
 	for i := 0; i < 3; i++ {
 		syslogMsg := []byte("HelloThisIsAMessage" + strconv.FormatInt(int64(i), 10))
 		syslogMsgLen := len(syslogMsg)
-		msgBatch := RelpBatch{}
+		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-			cmd:        RELP_SYSLOG,
-			dataLength: syslogMsgLen,
-			data:       syslogMsg,
+		msgBatch.PutRequest(&RelpFrame.TX{RelpFrame: RelpFrame.RelpFrame{
+			Cmd:        RelpCommand.RELP_SYSLOG,
+			DataLength: syslogMsgLen,
+			Data:       syslogMsg,
 		}})
 
 		// kill server after first batch for 2 seconds
@@ -379,15 +384,15 @@ func TestMultiMessageBatchWithDisconnectTLS(t *testing.T) {
 
 		// put 3 messages on batches 0 and 2, and 1 message on batch 1
 		if i != 1 {
-			msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-				cmd:        RELP_SYSLOG,
-				dataLength: syslogMsgLen,
-				data:       syslogMsg,
+			msgBatch.PutRequest(&RelpFrame.TX{RelpFrame: RelpFrame.RelpFrame{
+				Cmd:        RelpCommand.RELP_SYSLOG,
+				DataLength: syslogMsgLen,
+				Data:       syslogMsg,
 			}})
-			msgBatch.PutRequest(&RelpFrameTX{RelpFrame{
-				cmd:        RELP_SYSLOG,
-				dataLength: syslogMsgLen,
-				data:       syslogMsg,
+			msgBatch.PutRequest(&RelpFrame.TX{RelpFrame: RelpFrame.RelpFrame{
+				Cmd:        RelpCommand.RELP_SYSLOG,
+				DataLength: syslogMsgLen,
+				Data:       syslogMsg,
 			}})
 		}
 
@@ -419,8 +424,8 @@ func TestMultiMessageBatchWithDisconnectTLS(t *testing.T) {
 	}
 
 	// no stuff pending
-	if sess.window.Size() != 0 {
-		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.window.Size())
+	if sess.Window.Size() != 0 {
+		t.Errorf("RelpConnection.Window was not empty! (size=%v); want 0", sess.Window.Size())
 	}
 
 	// kill server
@@ -434,7 +439,7 @@ func TestMultiMessageBatchWithDisconnectTLS(t *testing.T) {
 // Utils for testing
 
 // retryRelpConnection disconnects and attempts to reconnect to the server every 5 seconds until succeeds
-func retryRelpConnection(relpSess *RelpConnection) {
+func retryRelpConnection(relpSess *RelpConnection.RelpConnection) {
 	relpSess.TearDown()
 	var cSuccess bool
 	var cErr error
@@ -455,7 +460,7 @@ func initServerConnection(tlsMode bool) *exec.Cmd {
 	// get relp server jar
 	wd, _ := os.Getwd()
 	par := filepath.Dir(wd)
-	for !strings.HasSuffix(par, "/src") {
+	for !strings.HasSuffix(par, "/rlp_05") {
 		par = filepath.Dir(par)
 	}
 	jarLocation := par + "/resources/relp-server/java-relp-server-demo-jar-with-dependencies.jar"

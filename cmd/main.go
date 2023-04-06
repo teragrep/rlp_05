@@ -3,6 +3,10 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/teragrep/rlp_05/RelpBatch"
+	"github.com/teragrep/rlp_05/RelpConnection"
+	"github.com/teragrep/rlp_05/RelpDialer"
+	"github.com/teragrep/rlp_05/RelpFrame"
 	"log"
 	"time"
 )
@@ -11,16 +15,16 @@ import (
 var port = 1601
 
 func main() {
-	relpSess := RelpConnection{RelpDialer: &RelpTLSDialer{}}
+	relpSess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpTLSDialer{}}
 	relpSess.Init()
-	relpSess.tlsConfig = &tls.Config{InsecureSkipVerify: true}
-	batch := RelpBatch{}
+	relpSess.TlsConfig = &tls.Config{InsecureSkipVerify: true}
+	batch := RelpBatch.RelpBatch{}
 	batch.Init()
-	batch.PutRequest(&RelpFrameTX{
-		RelpFrame{
-			cmd:        "syslog",
-			dataLength: len([]byte("HelloWorld")),
-			data:       []byte("HelloWorld"),
+	batch.PutRequest(&RelpFrame.TX{
+		RelpFrame: RelpFrame.RelpFrame{
+			Cmd:        "syslog",
+			DataLength: len([]byte("HelloWorld")),
+			Data:       []byte("HelloWorld"),
 		},
 	})
 
@@ -51,7 +55,7 @@ func main() {
 	fmt.Scanf("%f", &a)
 }
 
-func retry(relpSess *RelpConnection) {
+func retry(relpSess *RelpConnection.RelpConnection) {
 	relpSess.TearDown()
 	var cSuccess bool
 	var cErr error
