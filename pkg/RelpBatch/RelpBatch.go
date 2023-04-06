@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/teragrep/rlp_05/internal/RelpCommand"
-	"github.com/teragrep/rlp_05/pkg/RelpFrame"
+	"github.com/teragrep/rlp_05/internal/RelpFrame"
 	"log"
 )
 

@@ -3,10 +3,10 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/teragrep/rlp_05/internal/RelpFrame"
 	"github.com/teragrep/rlp_05/pkg/RelpBatch"
 	"github.com/teragrep/rlp_05/pkg/RelpConnection"
 	"github.com/teragrep/rlp_05/pkg/RelpDialer"
-	"github.com/teragrep/rlp_05/pkg/RelpFrame"
 	"log"
 	"time"
 )

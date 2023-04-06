@@ -4,10 +4,10 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/teragrep/rlp_05/internal/RelpCommand"
+	"github.com/teragrep/rlp_05/internal/RelpFrame"
 	"github.com/teragrep/rlp_05/pkg/RelpBatch"
 	"github.com/teragrep/rlp_05/pkg/RelpConnection"
-	RelpDialer2 "github.com/teragrep/rlp_05/pkg/RelpDialer"
-	RelpFrame2 "github.com/teragrep/rlp_05/pkg/RelpFrame"
+	"github.com/teragrep/rlp_05/pkg/RelpDialer"
 	"log"
 	"os"
 	"os/exec"
@@ -26,7 +26,7 @@ func TestSingleMessage(t *testing.T) {
 	time.Sleep(time.Second)
 	// server ok, actual test
 
-	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer2.RelpPlainDialer{}}
+	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpPlainDialer{}}
 	sess.Init()
 	ok, _ := sess.Connect("127.0.0.1", 1601)
 
@@ -36,7 +36,7 @@ func TestSingleMessage(t *testing.T) {
 
 	msgBatch := RelpBatch.RelpBatch{}
 	msgBatch.Init()
-	msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
+	msgBatch.PutRequest(&RelpFrame.TX{Frame: RelpFrame.Frame{
 		Cmd:        RelpCommand.RELP_SYSLOG,
 		DataLength: len([]byte("HelloThisIsAMessage")),
 		Data:       []byte("HelloThisIsAMessage"),
@@ -76,7 +76,7 @@ func TestMultipleMessage(t *testing.T) {
 	relpServer := initServerConnection(false)
 	time.Sleep(time.Second)
 	// server ok, actual test
-	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer2.RelpPlainDialer{}}
+	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpPlainDialer{}}
 	sess.Init()
 	ok, _ := sess.Connect("127.0.0.1", 1601)
 
@@ -89,7 +89,7 @@ func TestMultipleMessage(t *testing.T) {
 		syslogMsgLen := len(syslogMsg)
 		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
+		msgBatch.PutRequest(&RelpFrame.TX{Frame: RelpFrame.Frame{
 			Cmd:        RelpCommand.RELP_SYSLOG,
 			DataLength: syslogMsgLen,
 			Data:       syslogMsg,
@@ -132,7 +132,7 @@ func TestMultipleMessageTLS(t *testing.T) {
 	relpServer := initServerConnection(true)
 	time.Sleep(time.Second)
 	// server ok, actual test
-	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer2.RelpTLSDialer{}}
+	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpTLSDialer{}}
 	sess.Init()
 	sess.TlsConfig = &tls.Config{InsecureSkipVerify: true}
 	ok, _ := sess.Connect("127.0.0.1", 1601)
@@ -146,7 +146,7 @@ func TestMultipleMessageTLS(t *testing.T) {
 		syslogMsgLen := len(syslogMsg)
 		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
+		msgBatch.PutRequest(&RelpFrame.TX{Frame: RelpFrame.Frame{
 			Cmd:        RelpCommand.RELP_SYSLOG,
 			DataLength: syslogMsgLen,
 			Data:       syslogMsg,
@@ -188,7 +188,7 @@ func TestMultiMessageBatch(t *testing.T) {
 	relpServer := initServerConnection(false)
 	time.Sleep(time.Second)
 	// server ok, actual test
-	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer2.RelpPlainDialer{}}
+	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpPlainDialer{}}
 	sess.Init()
 	ok, _ := sess.Connect("127.0.0.1", 1601)
 
@@ -204,7 +204,7 @@ func TestMultiMessageBatch(t *testing.T) {
 		syslogMsgLen := len(syslogMsg)
 		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
+		msgBatch.PutRequest(&RelpFrame.TX{Frame: RelpFrame.Frame{
 			Cmd:        RelpCommand.RELP_SYSLOG,
 			DataLength: syslogMsgLen,
 			Data:       syslogMsg,
@@ -212,12 +212,12 @@ func TestMultiMessageBatch(t *testing.T) {
 
 		// put 3 messages on batches 0 and 2, and 1 message on batch 1
 		if i != 1 {
-			msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
+			msgBatch.PutRequest(&RelpFrame.TX{Frame: RelpFrame.Frame{
 				Cmd:        RelpCommand.RELP_SYSLOG,
 				DataLength: syslogMsgLen,
 				Data:       syslogMsg,
 			}})
-			msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
+			msgBatch.PutRequest(&RelpFrame.TX{Frame: RelpFrame.Frame{
 				Cmd:        RelpCommand.RELP_SYSLOG,
 				DataLength: syslogMsgLen,
 				Data:       syslogMsg,
@@ -264,7 +264,7 @@ func TestMultiMessageBatchWithDisconnect(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// server ok, actual test
-	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer2.RelpPlainDialer{}}
+	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpPlainDialer{}}
 	sess.Init()
 	retryRelpConnection(&sess)
 
@@ -273,7 +273,7 @@ func TestMultiMessageBatchWithDisconnect(t *testing.T) {
 		syslogMsgLen := len(syslogMsg)
 		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame2.Frame{
+		msgBatch.PutRequest(&RelpFrame.TX{RelpFrame.Frame{
 			Cmd:        RelpCommand.RELP_SYSLOG,
 			DataLength: syslogMsgLen,
 			Data:       syslogMsg,
@@ -293,12 +293,12 @@ func TestMultiMessageBatchWithDisconnect(t *testing.T) {
 
 		// put 3 messages on batches 0 and 2, and 1 message on batch 1
 		if i != 1 {
-			msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame2.Frame{
+			msgBatch.PutRequest(&RelpFrame.TX{RelpFrame.Frame{
 				Cmd:        RelpCommand.RELP_SYSLOG,
 				DataLength: syslogMsgLen,
 				Data:       syslogMsg,
 			}})
-			msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame2.Frame{
+			msgBatch.PutRequest(&RelpFrame.TX{RelpFrame.Frame{
 				Cmd:        RelpCommand.RELP_SYSLOG,
 				DataLength: syslogMsgLen,
 				Data:       syslogMsg,
@@ -354,7 +354,7 @@ func TestMultiMessageBatchWithDisconnectTLS(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// server ok, actual test
-	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer2.RelpTLSDialer{}}
+	sess := RelpConnection.RelpConnection{RelpDialer: &RelpDialer.RelpTLSDialer{}}
 	sess.Init()
 	sess.TlsConfig = &tls.Config{InsecureSkipVerify: true}
 	retryRelpConnection(&sess)
@@ -364,7 +364,7 @@ func TestMultiMessageBatchWithDisconnectTLS(t *testing.T) {
 		syslogMsgLen := len(syslogMsg)
 		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
+		msgBatch.PutRequest(&RelpFrame.TX{Frame: RelpFrame.Frame{
 			Cmd:        RelpCommand.RELP_SYSLOG,
 			DataLength: syslogMsgLen,
 			Data:       syslogMsg,
@@ -384,12 +384,12 @@ func TestMultiMessageBatchWithDisconnectTLS(t *testing.T) {
 
 		// put 3 messages on batches 0 and 2, and 1 message on batch 1
 		if i != 1 {
-			msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
+			msgBatch.PutRequest(&RelpFrame.TX{Frame: RelpFrame.Frame{
 				Cmd:        RelpCommand.RELP_SYSLOG,
 				DataLength: syslogMsgLen,
 				Data:       syslogMsg,
 			}})
-			msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
+			msgBatch.PutRequest(&RelpFrame.TX{Frame: RelpFrame.Frame{
 				Cmd:        RelpCommand.RELP_SYSLOG,
 				DataLength: syslogMsgLen,
 				Data:       syslogMsg,
