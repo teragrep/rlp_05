@@ -2,11 +2,10 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
-	"fmt"
 	"io"
 	"log"
-	"net"
 	"os"
 	"time"
 )
@@ -21,12 +20,12 @@ const (
 // RelpConnection struct contains the necessary fields to
 // manage a TCP connection to the RELP server
 type RelpConnection struct {
+	RelpDialer
 	txId                 uint64
 	rxBufferSize         int
 	txBufferSize         int
 	preAllocTxBuffer     *bytes.Buffer
 	preAllocRxBuffer     []byte
-	connection           *net.Conn
 	state                int
 	window               *RelpWindow
 	offer                []byte
@@ -34,6 +33,7 @@ type RelpConnection struct {
 	lastPort             int
 	ackTimeoutDuration   time.Duration
 	writeTimeoutDuration time.Duration
+	tlsConfig            *tls.Config
 }
 
 // Init initializes the connection struct with CLOSED state and allocates the TX/RX buffers
@@ -48,6 +48,7 @@ func (relpConn *RelpConnection) Init() {
 	relpConn.offer = []byte("\nrelp_version=0\nrelp_software=RLP-05\ncommands=syslog\n")
 	relpConn.ackTimeoutDuration = 30 * time.Second
 	relpConn.writeTimeoutDuration = 30 * time.Second
+	relpConn.tlsConfig = &tls.Config{}
 }
 
 // Connect connects to the specified RELP server and sends OPEN message to initialize the connection.
@@ -55,6 +56,11 @@ func (relpConn *RelpConnection) Init() {
 func (relpConn *RelpConnection) Connect(hostname string, port int) (bool, error) {
 	if relpConn.state != STATE_CLOSED {
 		panic("Can't connect, the connection is not closed")
+	}
+
+	if relpConn.RelpDialer == nil {
+		panic("Can't connect, RelpDialer has not been set! Please set as RelpTLSDialer or RelpPlainDialer." +
+			" Use the relpConnection.tlsConfig to configure the TLS connection!")
 	}
 
 	// save used IP and port in case of needing to reconnect
@@ -65,17 +71,15 @@ func (relpConn *RelpConnection) Connect(hostname string, port int) (bool, error)
 	relpConn.txId = 0
 	relpConn.window.Init()
 
-	netConn, netErr := net.Dial("tcp", fmt.Sprintf("%v:%v", hostname, port))
+	encrypted, netErr := relpConn.RelpDialer.Dial(hostname, port, relpConn.tlsConfig)
 	if netErr != nil {
 		return false, &ConnectionEstablishmentError{
 			hostname:  hostname,
 			port:      port,
 			reason:    netErr.Error(),
-			encrypted: false,
+			encrypted: encrypted,
 			protocol:  "tcp",
 		}
-	} else {
-		relpConn.connection = &netConn
 	}
 
 	// send open session message
@@ -106,12 +110,9 @@ func (relpConn *RelpConnection) Connect(hostname string, port int) (bool, error)
 // TearDown closes the connection to the server.
 // The Disconnect method should be used instead.
 func (relpConn *RelpConnection) TearDown() {
-	if relpConn.connection != nil {
-		var cn = *relpConn.connection
-		err := cn.Close()
-		if err != nil {
-			log.Println("Error closing RELP connection")
-		}
+	err := relpConn.RelpDialer.Close()
+	if err != nil {
+		log.Println("Error closing RELP connection")
 	}
 
 	relpConn.state = STATE_CLOSED
@@ -209,7 +210,6 @@ func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) error {
 	log.Printf("ReadAcks.Entry> Reading ACKs for batchID: %v\n", batch.requestId)
 	var parser *RelpParser = nil
 	notComplete := relpConn.window.Size() > 0
-	var cn = *relpConn.connection
 
 	for notComplete { // until window is empty
 		readBytes := 0
@@ -219,12 +219,12 @@ func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) error {
 			}
 
 			// set ACK timeout duration, default 30 sec
-			errDl := cn.SetReadDeadline(time.Now().Add(relpConn.ackTimeoutDuration))
+			errDl := relpConn.RelpDialer.SetReadDeadline(relpConn.ackTimeoutDuration)
 			if errDl != nil {
 				return errors.New("error setting connection timeout")
 			}
+			n, err := relpConn.RelpDialer.Read(relpConn.preAllocRxBuffer)
 
-			n, err := cn.Read(relpConn.preAllocRxBuffer)
 			if err != nil {
 				if errors.Is(err, os.ErrDeadlineExceeded) {
 					// reading timed out
@@ -286,15 +286,18 @@ func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch) error {
 func (relpConn *RelpConnection) SendRelpRequest(tx *RelpFrameTX) error {
 	txN, err := tx.Write(relpConn.preAllocTxBuffer)
 
-	var cn = *relpConn.connection
-	dlErr := cn.SetWriteDeadline(time.Now().Add(relpConn.writeTimeoutDuration))
+	if err != nil {
+		return err
+	}
+
+	dlErr := relpConn.RelpDialer.SetWriteDeadline(relpConn.writeTimeoutDuration)
 	if dlErr != nil {
 		return dlErr
 	}
+	n, writeErr := relpConn.RelpDialer.Write(relpConn.preAllocTxBuffer.Bytes())
 
-	n, err := cn.Write(relpConn.preAllocTxBuffer.Bytes())
-	if err != nil {
-		return err
+	if writeErr != nil {
+		return writeErr
 	} else {
 		log.Printf("SendRelpRequest> Total of %v byte(s) written to server from %v given byte(s). (%v%%)",
 			n, txN, (1.00*n/txN)*100.0)
