@@ -7,13 +7,14 @@ Tested with Go v1.19.
 
 == Basic usage
 
-Initializes a RELP connection, and verifies each batch.
+Initializes an unencrypted RELP connection, and verifies each batch.
 [,go]
 ----
 func main() {
-    relpSess := RelpConnection{}
+    relpSess := RelpConnection{RelpDialer: &RelpPlainDialer{}}
+    // OR: use RelpTLSDialer as the RelpDialer, and configure...
     relpSess.Init()
-
+    // ...using relpSess.tlsConfig = &tls.Config{}
     batch := RelpBatch{}
     batch.Init()
     batch.PutRequest(&RelpFrameTX{
@@ -67,29 +68,38 @@ func retry(relpSess *RelpConnection) {
 |===
 |Method or field |Information
 
-|RelpConnection.Connect(hostname, port)
+|`RelpConnection.Connect(hostname, port)`
 |Initializes a TCP connection to the provided hostname:port address.
 
-|RelpConnection.ackTimeoutDuration
-|Duration, which the connection waits for a new ACK. Timeout will return error to RelpConnection.Commit() call.
+|`RelpConnection.RelpDialer`
+|Specifies whether to use `RelpPlainDialer` or `RelpTLSDialer`. Configure the TLS dialer
+with `RelpConnection.tlsConfig` (after `RelpConnection.Init()` call as the init call uses a blank config)
+
+
+|`RelpConnection.ackTimeoutDuration`
+|Duration, which the connection waits for a new ACK. Timeout will return error to `RelpConnection.Commit()` call.
 Default is 30 seconds.
 
-|RelpConnection.Commit(batch)
+|`RelpConnection.writeTimeoutDuration`
+|Duration, which the connection waits for a new write. Timeout will return error to `RelpConnection.Commit()` call.
+Default is 30 seconds.
+
+|`RelpConnection.Commit(batch)`
 |Sends the RelpBatch given as the argument to the established RELP connection.
 
-|RelpConnection.Disconnect()
+|`RelpConnection.Disconnect()`
 |Gracefully disconnects from the server.
 
-|RelpConnection.TearDown()
+|`RelpConnection.TearDown()`
 |Forcefully disconnects from the server.
 
-|RelpBatch.PutRequest(RelpFrameTX)
+|`RelpBatch.PutRequest(RelpFrameTX)`
 |Inserts a relp frame to the batch
 
-|RelpBatch.VerifyTransactionAll()
+|`RelpBatch.VerifyTransactionAll()`
 |Verifies that all transactions got acknowledged by the server. Returns boolean.
 
-|RelpBatch.RetryAllFailed()
+|`RelpBatch.RetryAllFailed()`
 |Adds all transactions back to the working queue. Restart the connection with tearDown+connect to try again.
 |===
 

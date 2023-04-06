@@ -1,16 +1,19 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"time"
 )
 
 // Usage example
-func main() {
-	relpSess := RelpConnection{}
-	relpSess.Init()
+var port = 1601
 
+func main() {
+	relpSess := RelpConnection{RelpDialer: &RelpTLSDialer{}}
+	relpSess.Init()
+	relpSess.tlsConfig = &tls.Config{InsecureSkipVerify: true}
 	batch := RelpBatch{}
 	batch.Init()
 	batch.PutRequest(&RelpFrameTX{
@@ -52,11 +55,11 @@ func retry(relpSess *RelpConnection) {
 	relpSess.TearDown()
 	var cSuccess bool
 	var cErr error
-	cSuccess, cErr = relpSess.Connect("127.0.0.1", 1601)
+	cSuccess, cErr = relpSess.Connect("127.0.0.1", port)
 	for !cSuccess || cErr != nil {
 		fmt.Println(cErr.Error())
 		relpSess.TearDown()
 		time.Sleep(5 * time.Second)
-		cSuccess, cErr = relpSess.Connect("127.0.0.1", 1601)
+		cSuccess, cErr = relpSess.Connect("127.0.0.1", port)
 	}
 }
