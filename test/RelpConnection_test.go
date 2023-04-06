@@ -36,7 +36,7 @@ func TestSingleMessage(t *testing.T) {
 
 	msgBatch := RelpBatch.RelpBatch{}
 	msgBatch.Init()
-	msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame: RelpFrame2.RelpFrame{
+	msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
 		Cmd:        RelpCommand.RELP_SYSLOG,
 		DataLength: len([]byte("HelloThisIsAMessage")),
 		Data:       []byte("HelloThisIsAMessage"),
@@ -89,7 +89,7 @@ func TestMultipleMessage(t *testing.T) {
 		syslogMsgLen := len(syslogMsg)
 		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame: RelpFrame2.RelpFrame{
+		msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
 			Cmd:        RelpCommand.RELP_SYSLOG,
 			DataLength: syslogMsgLen,
 			Data:       syslogMsg,
@@ -146,7 +146,7 @@ func TestMultipleMessageTLS(t *testing.T) {
 		syslogMsgLen := len(syslogMsg)
 		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame: RelpFrame2.RelpFrame{
+		msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
 			Cmd:        RelpCommand.RELP_SYSLOG,
 			DataLength: syslogMsgLen,
 			Data:       syslogMsg,
@@ -204,7 +204,7 @@ func TestMultiMessageBatch(t *testing.T) {
 		syslogMsgLen := len(syslogMsg)
 		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame: RelpFrame2.RelpFrame{
+		msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
 			Cmd:        RelpCommand.RELP_SYSLOG,
 			DataLength: syslogMsgLen,
 			Data:       syslogMsg,
@@ -212,12 +212,12 @@ func TestMultiMessageBatch(t *testing.T) {
 
 		// put 3 messages on batches 0 and 2, and 1 message on batch 1
 		if i != 1 {
-			msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame: RelpFrame2.RelpFrame{
+			msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
 				Cmd:        RelpCommand.RELP_SYSLOG,
 				DataLength: syslogMsgLen,
 				Data:       syslogMsg,
 			}})
-			msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame: RelpFrame2.RelpFrame{
+			msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
 				Cmd:        RelpCommand.RELP_SYSLOG,
 				DataLength: syslogMsgLen,
 				Data:       syslogMsg,
@@ -273,7 +273,7 @@ func TestMultiMessageBatchWithDisconnect(t *testing.T) {
 		syslogMsgLen := len(syslogMsg)
 		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame2.RelpFrame{
+		msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame2.Frame{
 			Cmd:        RelpCommand.RELP_SYSLOG,
 			DataLength: syslogMsgLen,
 			Data:       syslogMsg,
@@ -293,12 +293,12 @@ func TestMultiMessageBatchWithDisconnect(t *testing.T) {
 
 		// put 3 messages on batches 0 and 2, and 1 message on batch 1
 		if i != 1 {
-			msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame2.RelpFrame{
+			msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame2.Frame{
 				Cmd:        RelpCommand.RELP_SYSLOG,
 				DataLength: syslogMsgLen,
 				Data:       syslogMsg,
 			}})
-			msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame2.RelpFrame{
+			msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame2.Frame{
 				Cmd:        RelpCommand.RELP_SYSLOG,
 				DataLength: syslogMsgLen,
 				Data:       syslogMsg,
@@ -364,7 +364,7 @@ func TestMultiMessageBatchWithDisconnectTLS(t *testing.T) {
 		syslogMsgLen := len(syslogMsg)
 		msgBatch := RelpBatch.RelpBatch{}
 		msgBatch.Init()
-		msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame: RelpFrame2.RelpFrame{
+		msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
 			Cmd:        RelpCommand.RELP_SYSLOG,
 			DataLength: syslogMsgLen,
 			Data:       syslogMsg,
@@ -384,12 +384,12 @@ func TestMultiMessageBatchWithDisconnectTLS(t *testing.T) {
 
 		// put 3 messages on batches 0 and 2, and 1 message on batch 1
 		if i != 1 {
-			msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame: RelpFrame2.RelpFrame{
+			msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
 				Cmd:        RelpCommand.RELP_SYSLOG,
 				DataLength: syslogMsgLen,
 				Data:       syslogMsg,
 			}})
-			msgBatch.PutRequest(&RelpFrame2.TX{RelpFrame: RelpFrame2.RelpFrame{
+			msgBatch.PutRequest(&RelpFrame2.TX{Frame: RelpFrame2.Frame{
 				Cmd:        RelpCommand.RELP_SYSLOG,
 				DataLength: syslogMsgLen,
 				Data:       syslogMsg,

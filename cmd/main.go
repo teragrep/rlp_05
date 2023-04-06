@@ -21,7 +21,7 @@ func main() {
 	batch := RelpBatch.RelpBatch{}
 	batch.Init()
 	batch.PutRequest(&RelpFrame2.TX{
-		RelpFrame: RelpFrame2.RelpFrame{
+		Frame: RelpFrame2.Frame{
 			Cmd:        "syslog",
 			DataLength: len([]byte("HelloWorld")),
 			Data:       []byte("HelloWorld"),

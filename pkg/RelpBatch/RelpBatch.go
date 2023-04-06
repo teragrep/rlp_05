@@ -31,7 +31,7 @@ func (batch *RelpBatch) Init() {
 // Works similarly to calling PutRequest with a syslog message request frame
 func (batch *RelpBatch) Insert(syslogMsg []byte) uint64 {
 	relpRequest := RelpFrame2.TX{
-		RelpFrame: RelpFrame2.RelpFrame{
+		Frame: RelpFrame2.Frame{
 			Data:       syslogMsg,
 			DataLength: len(syslogMsg),
 			Cmd:        RelpCommand.RELP_SYSLOG,

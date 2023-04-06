@@ -7,7 +7,7 @@ import (
 
 // RX RelpFrameRX is a struct containing the response frame
 type RX struct {
-	RelpFrame
+	Frame
 }
 
 // ParseResponseCode parses the response code as an integer from the request frame.

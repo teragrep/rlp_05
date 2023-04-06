@@ -8,7 +8,7 @@ import (
 
 // TX RelpFrameTX is a struct containing a request RELP frame
 type TX struct {
-	RelpFrame
+	Frame
 }
 
 const (
