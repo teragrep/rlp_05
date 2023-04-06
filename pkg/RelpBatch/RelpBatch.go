@@ -5,23 +5,23 @@ import (
 	"errors"
 	"fmt"
 	"github.com/teragrep/rlp_05/internal/RelpCommand"
-	RelpFrame2 "github.com/teragrep/rlp_05/pkg/RelpFrame"
+	"github.com/teragrep/rlp_05/pkg/RelpFrame"
 	"log"
 )
 
 // RelpBatch struct contains all the request frames and their response counterparts.
 // the workQueue is used to keep track of the current, yet-to-be processed requests.
 type RelpBatch struct {
-	requests  map[uint64]*RelpFrame2.TX
-	responses map[uint64]*RelpFrame2.RX
+	requests  map[uint64]*RelpFrame.TX
+	responses map[uint64]*RelpFrame.RX
 	workQueue *list.List
 	RequestId uint64
 }
 
 // Init initializes the batch with new maps and list
 func (batch *RelpBatch) Init() {
-	batch.requests = make(map[uint64]*RelpFrame2.TX)
-	batch.responses = make(map[uint64]*RelpFrame2.RX)
+	batch.requests = make(map[uint64]*RelpFrame.TX)
+	batch.responses = make(map[uint64]*RelpFrame.RX)
 	batch.workQueue = list.New()
 	batch.RequestId = 0 // id within this batch
 }
@@ -30,8 +30,8 @@ func (batch *RelpBatch) Init() {
 // id SP syslog SP dataLength SP data NL
 // Works similarly to calling PutRequest with a syslog message request frame
 func (batch *RelpBatch) Insert(syslogMsg []byte) uint64 {
-	relpRequest := RelpFrame2.TX{
-		Frame: RelpFrame2.Frame{
+	relpRequest := RelpFrame.TX{
+		Frame: RelpFrame.Frame{
 			Data:       syslogMsg,
 			DataLength: len(syslogMsg),
 			Cmd:        RelpCommand.RELP_SYSLOG,
@@ -44,7 +44,7 @@ func (batch *RelpBatch) Insert(syslogMsg []byte) uint64 {
 // PutRequest puts the given request frame to the requests map and work queue
 // batch.requestId is different from tx.transactionId
 // !!! requestId resets each batch but transactionId is the same for all for one relp session
-func (batch *RelpBatch) PutRequest(tx *RelpFrame2.TX) uint64 {
+func (batch *RelpBatch) PutRequest(tx *RelpFrame.TX) uint64 {
 	batch.RequestId += 1
 	batch.requests[batch.RequestId] = tx
 	batch.workQueue.PushBack(batch.RequestId)
@@ -54,7 +54,7 @@ func (batch *RelpBatch) PutRequest(tx *RelpFrame2.TX) uint64 {
 
 // GetRequest gets the request frame from the requests map, if found.
 // Otherwise will send a "could not find batch <id> request" error
-func (batch *RelpBatch) GetRequest(id uint64) (*RelpFrame2.TX, error) {
+func (batch *RelpBatch) GetRequest(id uint64) (*RelpFrame.TX, error) {
 	v, ok := batch.requests[id]
 	if ok {
 		return v, nil
@@ -81,7 +81,7 @@ func (batch *RelpBatch) RemoveRequest(id uint64) {
 
 // GetResponse gets the specified request from the map, if found
 // Otherwise, returns "could not find batch <id> response" error
-func (batch *RelpBatch) GetResponse(id uint64) (*RelpFrame2.RX, error) {
+func (batch *RelpBatch) GetResponse(id uint64) (*RelpFrame.RX, error) {
 	v, ok := batch.responses[id]
 	if ok {
 		return v, nil
@@ -91,7 +91,7 @@ func (batch *RelpBatch) GetResponse(id uint64) (*RelpFrame2.RX, error) {
 }
 
 // PutResponse puts the specified response frame to the response map
-func (batch *RelpBatch) PutResponse(id uint64, response *RelpFrame2.RX) {
+func (batch *RelpBatch) PutResponse(id uint64, response *RelpFrame.RX) {
 	_, ok := batch.requests[id]
 	if ok {
 		batch.responses[id] = response

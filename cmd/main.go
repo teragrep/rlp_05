@@ -6,7 +6,7 @@ import (
 	"github.com/teragrep/rlp_05/pkg/RelpBatch"
 	"github.com/teragrep/rlp_05/pkg/RelpConnection"
 	"github.com/teragrep/rlp_05/pkg/RelpDialer"
-	RelpFrame2 "github.com/teragrep/rlp_05/pkg/RelpFrame"
+	"github.com/teragrep/rlp_05/pkg/RelpFrame"
 	"log"
 	"time"
 )
@@ -20,8 +20,8 @@ func main() {
 	relpSess.TlsConfig = &tls.Config{InsecureSkipVerify: true}
 	batch := RelpBatch.RelpBatch{}
 	batch.Init()
-	batch.PutRequest(&RelpFrame2.TX{
-		Frame: RelpFrame2.Frame{
+	batch.PutRequest(&RelpFrame.TX{
+		Frame: RelpFrame.Frame{
 			Cmd:        "syslog",
 			DataLength: len([]byte("HelloWorld")),
 			Data:       []byte("HelloWorld"),
