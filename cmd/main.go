@@ -3,10 +3,10 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/teragrep/rlp_05/RelpBatch"
-	"github.com/teragrep/rlp_05/RelpConnection"
-	"github.com/teragrep/rlp_05/RelpDialer"
-	"github.com/teragrep/rlp_05/RelpFrame"
+	"github.com/teragrep/rlp_05/pkg/RelpBatch"
+	"github.com/teragrep/rlp_05/pkg/RelpConnection"
+	"github.com/teragrep/rlp_05/pkg/RelpDialer"
+	RelpFrame2 "github.com/teragrep/rlp_05/pkg/RelpFrame"
 	"log"
 	"time"
 )
@@ -20,8 +20,8 @@ func main() {
 	relpSess.TlsConfig = &tls.Config{InsecureSkipVerify: true}
 	batch := RelpBatch.RelpBatch{}
 	batch.Init()
-	batch.PutRequest(&RelpFrame.TX{
-		RelpFrame: RelpFrame.RelpFrame{
+	batch.PutRequest(&RelpFrame2.TX{
+		RelpFrame: RelpFrame2.RelpFrame{
 			Cmd:        "syslog",
 			DataLength: len([]byte("HelloWorld")),
 			Data:       []byte("HelloWorld"),

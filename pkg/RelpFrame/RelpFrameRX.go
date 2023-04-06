@@ -1,7 +1,7 @@
 package RelpFrame
 
 import (
-	"github.com/teragrep/rlp_05/Errors"
+	"github.com/teragrep/rlp_05/internal/Errors"
 	"strconv"
 )
 

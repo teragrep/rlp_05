@@ -2,8 +2,8 @@ package RelpParser
 
 import (
 	"bytes"
-	"github.com/teragrep/rlp_05/Errors"
-	"github.com/teragrep/rlp_05/RelpCommand"
+	"github.com/teragrep/rlp_05/internal/Errors"
+	"github.com/teragrep/rlp_05/internal/RelpCommand"
 	"log"
 	"strconv"
 	"strings"

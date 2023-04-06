@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
-	"github.com/teragrep/rlp_05/Errors"
-	"github.com/teragrep/rlp_05/RelpBatch"
-	"github.com/teragrep/rlp_05/RelpCommand"
-	"github.com/teragrep/rlp_05/RelpDialer"
-	"github.com/teragrep/rlp_05/RelpFrame"
-	"github.com/teragrep/rlp_05/RelpParser"
-	"github.com/teragrep/rlp_05/RelpWindow"
+	"github.com/teragrep/rlp_05/internal/Errors"
+	"github.com/teragrep/rlp_05/internal/RelpCommand"
+	"github.com/teragrep/rlp_05/internal/RelpParser"
+	"github.com/teragrep/rlp_05/internal/RelpWindow"
+	"github.com/teragrep/rlp_05/pkg/RelpBatch"
+	"github.com/teragrep/rlp_05/pkg/RelpDialer"
+	RelpFrame2 "github.com/teragrep/rlp_05/pkg/RelpFrame"
 	"io"
 	"log"
 	"os"
@@ -90,8 +90,8 @@ func (relpConn *RelpConnection) Connect(hostname string, port int) (bool, error)
 	}
 
 	// send open session message
-	relpRequest := RelpFrame.TX{
-		RelpFrame: RelpFrame.RelpFrame{
+	relpRequest := RelpFrame2.TX{
+		RelpFrame: RelpFrame2.RelpFrame{
 			TransactionId: relpConn.txId,
 			Cmd:           RelpCommand.RELP_OPEN,
 			DataLength:    len(relpConn.offer),
@@ -131,7 +131,7 @@ func (relpConn *RelpConnection) Disconnect() bool {
 	if relpConn.state != STATE_OPEN {
 		panic("Cannot disconnect, connection was not OPEN")
 	}
-	relpRequest := RelpFrame.TX{RelpFrame: RelpFrame.RelpFrame{
+	relpRequest := RelpFrame2.TX{RelpFrame: RelpFrame2.RelpFrame{
 		TransactionId: relpConn.txId,
 		Cmd:           RelpCommand.RELP_CLOSE,
 		DataLength:    0,
@@ -263,8 +263,8 @@ func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch.RelpBatch) error {
 					if err != nil {
 						panic("Could not find given pending txnId from RelpWindow!")
 					}
-					response := RelpFrame.RX{
-						RelpFrame: RelpFrame.RelpFrame{
+					response := RelpFrame2.RX{
+						RelpFrame: RelpFrame2.RelpFrame{
 							TransactionId: parser.FrameTxnId,
 							Cmd:           parser.FrameCmdString,
 							DataLength:    parser.FrameLen,
@@ -290,7 +290,7 @@ func (relpConn *RelpConnection) ReadAcks(batch *RelpBatch.RelpBatch) error {
 }
 
 // SendRelpRequest sends the RELP frame to the connected RELP server
-func (relpConn *RelpConnection) SendRelpRequest(tx *RelpFrame.TX) error {
+func (relpConn *RelpConnection) SendRelpRequest(tx *RelpFrame2.TX) error {
 	txN, err := tx.Write(relpConn.preAllocTxBuffer)
 
 	if err != nil {
