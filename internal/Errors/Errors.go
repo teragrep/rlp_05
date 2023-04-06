@@ -1,46 +1,46 @@
-package main
+package Errors
 
 import "fmt"
 
 type ResponseParsingError struct {
-	position string
-	reason   string
+	Position string
+	Reason   string
 }
 
 func (rpe *ResponseParsingError) Error() string {
 	return fmt.Sprintf("error occurred while parsing response at position %s, reason: %s",
-		rpe.position, rpe.reason)
+		rpe.Position, rpe.Reason)
 }
 
 type ResponseCodeParsingError struct {
-	reason string
+	Reason string
 }
 
 func (rcpe *ResponseCodeParsingError) Error() string {
-	return fmt.Sprintf("Error parsing response code: %s", rcpe.reason)
+	return fmt.Sprintf("Error parsing response code: %s", rcpe.Reason)
 }
 
 type AckReadingError struct {
-	reason string
+	Reason string
 }
 
 func (are *AckReadingError) Error() string {
-	return fmt.Sprintf("ACK reading error: %s", are.reason)
+	return fmt.Sprintf("ACK reading error: %s", are.Reason)
 }
 
 type ConnectionEstablishmentError struct {
-	hostname  string
-	port      int
-	reason    string
-	encrypted bool
-	protocol  string
+	Hostname  string
+	Port      int
+	Reason    string
+	Encrypted bool
+	Protocol  string
 }
 
 func (cee *ConnectionEstablishmentError) Error() string {
 	encryptedStr := "unencrypted"
-	if cee.encrypted {
+	if cee.Encrypted {
 		encryptedStr = "encrypted"
 	}
 	return fmt.Sprintf("Could not establish %v connection to %v:%v using protocol %v for reason: %v",
-		encryptedStr, cee.hostname, cee.port, cee.protocol, cee.reason)
+		encryptedStr, cee.Hostname, cee.Port, cee.Protocol, cee.Reason)
 }

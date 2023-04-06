@@ -1,4 +1,4 @@
-package main
+package RelpCommand
 
 // contains all the RELP commands as constants
 const (

@@ -1,7 +1,9 @@
-package main
+package RelpParser
 
 import (
 	"bytes"
+	"github.com/teragrep/rlp_05/internal/Errors"
+	"github.com/teragrep/rlp_05/internal/RelpCommand"
 	"log"
 	"strconv"
 	"strings"
@@ -22,14 +24,14 @@ const (
 // and frameData fields.
 type RelpParser struct {
 	state            int
-	isComplete       bool
+	IsComplete       bool
 	frameTxnIdString string
-	frameTxnId       uint64
-	frameCmdString   string
+	FrameTxnId       uint64
+	FrameCmdString   string
 	frameLenString   string
-	frameLen         int
+	FrameLen         int
 	frameLenLeft     int
-	frameData        *bytes.Buffer
+	FrameData        *bytes.Buffer
 }
 
 // Parse is used to parse the incoming response (RX).
@@ -41,12 +43,12 @@ func (parser *RelpParser) Parse(b byte) error {
 			if b == ' ' {
 				num, err := strconv.ParseUint(parser.frameTxnIdString, 10, 64)
 				if err != nil {
-					return &ResponseParsingError{
-						position: "txn",
-						reason:   "could not parse frameTxnId from string: " + err.Error(),
+					return &Errors.ResponseParsingError{
+						Position: "txn",
+						Reason:   "could not parse frameTxnId from string: " + err.Error(),
 					}
 				} else {
-					parser.frameTxnId = num
+					parser.FrameTxnId = num
 					parser.state = PS_CMD
 				}
 			} else {
@@ -58,20 +60,20 @@ func (parser *RelpParser) Parse(b byte) error {
 			if b == ' ' {
 				parser.state = PS_LEN
 				// constraints
-				if len(parser.frameCmdString) > MAX_CMD_LEN &&
-					strings.Compare(parser.frameCmdString, RELP_OPEN) != 0 &&
-					strings.Compare(parser.frameCmdString, RELP_CLOSE) != 0 &&
-					strings.Compare(parser.frameCmdString, RELP_ABORT) != 0 &&
-					strings.Compare(parser.frameCmdString, RELP_SERVER_CLOSE) != 0 &&
-					strings.Compare(parser.frameCmdString, RELP_SYSLOG) != 0 &&
-					strings.Compare(parser.frameCmdString, RELP_RSP) != 0 {
-					return &ResponseParsingError{
-						position: "cmd",
-						reason:   "invalid command",
+				if len(parser.FrameCmdString) > MAX_CMD_LEN &&
+					strings.Compare(parser.FrameCmdString, RelpCommand.RELP_OPEN) != 0 &&
+					strings.Compare(parser.FrameCmdString, RelpCommand.RELP_CLOSE) != 0 &&
+					strings.Compare(parser.FrameCmdString, RelpCommand.RELP_ABORT) != 0 &&
+					strings.Compare(parser.FrameCmdString, RelpCommand.RELP_SERVER_CLOSE) != 0 &&
+					strings.Compare(parser.FrameCmdString, RelpCommand.RELP_SYSLOG) != 0 &&
+					strings.Compare(parser.FrameCmdString, RelpCommand.RELP_RSP) != 0 {
+					return &Errors.ResponseParsingError{
+						Position: "cmd",
+						Reason:   "invalid command",
 					}
 				}
 			} else {
-				parser.frameCmdString += string(b)
+				parser.FrameCmdString += string(b)
 			}
 			break
 		}
@@ -81,26 +83,26 @@ func (parser *RelpParser) Parse(b byte) error {
 			if b == ' ' || b == '\n' {
 				num, err := strconv.ParseInt(parser.frameLenString, 10, 64)
 				if err != nil {
-					return &ResponseParsingError{
-						position: "len",
-						reason:   "could not parse frame length from string to int64",
+					return &Errors.ResponseParsingError{
+						Position: "len",
+						Reason:   "could not parse frame length from string to int64",
 					}
 				} else {
-					parser.frameLen = int(num)
+					parser.FrameLen = int(num)
 				}
 
-				if parser.frameLen < 0 {
-					return &ResponseParsingError{
-						position: "len",
-						reason:   "frame length must be of size 0 or larger",
+				if parser.FrameLen < 0 {
+					return &Errors.ResponseParsingError{
+						Position: "len",
+						Reason:   "frame length must be of size 0 or larger",
 					}
 				}
 
-				parser.frameLenLeft = parser.frameLen
-				parser.frameData = bytes.NewBuffer(make([]byte, 0, parser.frameLen))
+				parser.frameLenLeft = parser.FrameLen
+				parser.FrameData = bytes.NewBuffer(make([]byte, 0, parser.FrameLen))
 
 				// length bytes done, move to next stage
-				if parser.frameLen == 0 {
+				if parser.FrameLen == 0 {
 					// no data
 					parser.state = PS_NL
 				} else {
@@ -109,8 +111,8 @@ func (parser *RelpParser) Parse(b byte) error {
 				}
 
 				if b == '\n' {
-					if parser.frameLen == 0 {
-						parser.isComplete = true
+					if parser.FrameLen == 0 {
+						parser.IsComplete = true
 					}
 				}
 			} else {
@@ -120,13 +122,13 @@ func (parser *RelpParser) Parse(b byte) error {
 		}
 	case PS_DATA:
 		{
-			if parser.isComplete {
+			if parser.IsComplete {
 				parser.state = PS_NL
 			}
 
 			// only read frameLen of data
 			if parser.frameLenLeft > 0 {
-				parser.frameData.WriteByte(b)
+				parser.FrameData.WriteByte(b)
 				parser.frameLenLeft -= 1
 			}
 
@@ -138,11 +140,11 @@ func (parser *RelpParser) Parse(b byte) error {
 		}
 	case PS_NL:
 		{
-			parser.isComplete = true
+			parser.IsComplete = true
 			if b == '\n' {
 				// RELP msg always ends with NL
 				log.Printf("RelpParser: Parser complete. Got: %v %v %v %v\n",
-					parser.frameTxnId, parser.frameCmdString, parser.frameLen, parser.frameData)
+					parser.FrameTxnId, parser.FrameCmdString, parser.FrameLen, parser.FrameData)
 			} else {
 				log.Println("RelpParser: Final byte was not NL, completed.")
 			}

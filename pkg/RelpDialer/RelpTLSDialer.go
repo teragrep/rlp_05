@@ -1,4 +1,4 @@
-package main
+package RelpDialer
 
 import (
 	"crypto/tls"
